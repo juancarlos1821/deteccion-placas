@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "flask": "python app.py",
+    "tailwind": "npx tailwindcss -i ./static/css/styles.css -o ./static/css/output.css --watch",
+    "dev": "concurrently \"npm run tailwind\" \"npm run flask\""
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "concurrently": "^9.1.2",
+    "tailwindcss": "^4.1.18"
+  }
+}

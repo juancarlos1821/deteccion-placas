@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Control UNPRG{% endblock %}</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .theme-btn {
+            width: 36px;
+            height: 36px;
+        }
+
+        /* ===== GLASSMORPHISM SIDEBAR ===== */
+        .glass-sidebar {
+            background: rgba(15, 12, 41, 0.85);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .sidebar-link {
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-link:hover {
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .sidebar-link.active {
+            background: rgba(99, 102, 241, 0.15);
+            border-left: 3px solid #818cf8;
+        }
+
+        /* ===== GLASS HEADER ===== */
+        .glass-header {
+            background: rgba(15, 12, 41, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        /* ===== ANIMATED BG FOR MAIN AREA ===== */
+        .main-bg {
+            background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%);
+        }
+
+        /* ===== GLASS CARDS ===== */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.1);
+            transform: translateY(-2px);
+        }
+
+        /* ===== USER DROPDOWN GLASS ===== */
+        .glass-dropdown {
+            background: rgba(30, 27, 60, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+
+<body class="transition-colors duration-300">
+
+    <div class="flex h-screen overflow-hidden main-bg text-gray-100">
+
+        <!-- ===== GLASSMORPHISM SIDEBAR ===== -->
+        <aside id="sidebar" class="glass-sidebar w-64 hidden md:flex flex-col transition-all duration-300 z-30">
+
+            <!-- Logo -->
+            <div class="h-16 flex items-center justify-between px-6 border-b border-white/[0.06]">
+                <div class="flex items-center gap-3 font-bold text-lg">
+                    <div class="bg-indigo-500/20 text-indigo-400 p-2 rounded-xl border border-indigo-400/20">
+                        <i class="fa-solid fa-shield-halved text-sm"></i>
+                    </div>
+                    <span class="sidebar-text text-white tracking-tight">Control UNPRG</span>
+                </div>
+                <button id="collapseSidebarBtn" class="text-slate-500 hover:text-indigo-400 transition-colors">
+                    <i id="collapseIcon" class="fa-solid fa-chevron-left text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 overflow-y-auto py-6 px-3 space-y-1">
+                <p class="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-3 sidebar-text">
+                    Operaciones</p>
+
+                <a href="{{ url_for('home') }}"
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'home' else 'text-slate-400 hover:text-white' }}">
+                    <i class="fa-solid fa-chart-line w-5 text-center"></i>
+                    <span class="sidebar-text">Dashboard</span>
+                </a>
+
+                <a href="{{ url_for('camaras') }}"
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'camaras' else 'text-slate-400 hover:text-white' }}">
+                    <i class="fa-solid fa-video w-5 text-center"></i>
+                    <span class="sidebar-text">Cámaras en Vivo</span>
+                </a>
+
+                <a href="{{ url_for('historial') }}"
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'historial' else 'text-slate-400 hover:text-white' }}">
+                    <i class="fa-solid fa-clock-rotate-left w-5 text-center"></i>
+                    <span class="sidebar-text">Historial Accesos</span>
+                </a>
+
+                <p
+                    class="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-widest mt-8 mb-3 sidebar-text">
+                    Descargas</p>
+
+                <a href="{{ url_for('reportes') }}"
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'reportes' else 'text-slate-400 hover:text-white' }}">
+                    <i class="fa-solid fa-file-arrow-down w-5 text-center"></i>
+                    <span class="sidebar-text">Reportes</span>
+                </a>
+            </nav>
+
+            <!-- User Info -->
+            <div class="p-4 flex items-center gap-3 border-t border-white/[0.06]">
+                <div
+                    class="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-400 border border-indigo-400/20">
+                    {{ session.get('usuario', 'U')[0]|upper }}
+                </div>
+                <div class="sidebar-text">
+                    <p class="text-sm font-medium text-white">{{ session.get('usuario', 'Usuario') }}</p>
+                    <p class="text-[11px] text-slate-500">Admin UNPRG</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ===== MAIN CONTENT ===== -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+
+            <!-- Glass Header -->
+            <header class="glass-header h-16 flex items-center justify-between px-6 z-10">
+                <button id="mobileMenuBtn" class="md:hidden text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+
+                <div class="flex items-center gap-4 ml-auto">
+                    <!-- Theme Toggle -->
+                    <div class="flex bg-white/5 rounded-xl p-1 border border-white/[0.06]">
+                        <button id="lightBtn"
+                            class="theme-btn rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
+                            <i class="fa-solid fa-sun text-sm text-amber-400"></i>
+                        </button>
+                        <button id="darkBtn"
+                            class="theme-btn rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
+                            <i class="fa-solid fa-moon text-sm text-indigo-400"></i>
+                        </button>
+                    </div>
+
+                    <!-- User Dropdown -->
+                    <div class="relative">
+                        <button id="userMenuBtn"
+                            class="flex items-center gap-2 text-slate-300 hover:text-white transition-colors">
+                            <span class="text-sm font-medium">{{ session.get('usuario', 'Usuario') }}</span>
+                            <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                        </button>
+                        <div id="userDropdown"
+                            class="glass-dropdown absolute right-0 mt-3 w-48 rounded-xl shadow-2xl hidden z-50 overflow-hidden">
+                            <a href="{{ url_for('perfil') }}"
+                                class="flex items-center gap-2.5 px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                                <i class="fa-solid fa-user text-xs text-slate-500"></i> Mi Perfil
+                            </a>
+                            <div class="border-t border-white/[0.06]"></div>
+                            <a href="{{ url_for('logout') }}"
+                                class="flex items-center gap-2.5 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors">
+                                <i class="fa-solid fa-right-from-bracket text-xs"></i> Cerrar Sesión
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <main class="flex-1 p-6 overflow-x-hidden overflow-y-auto">
+                {% block content %}
+                {% endblock %}
+            </main>
+
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const html = document.documentElement;
+
+            function setTheme(theme) {
+                html.classList.toggle('dark', theme === 'dark');
+                localStorage.setItem('theme', theme);
+            }
+            setTheme(localStorage.getItem('theme') || 'dark');
+
+            document.getElementById('lightBtn').onclick = () => setTheme('light');
+            document.getElementById('darkBtn').onclick = () => setTheme('dark');
+
+            const userBtn = document.getElementById('userMenuBtn');
+            const userDropdown = document.getElementById('userDropdown');
+
+            if (userBtn) {
+                userBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    userDropdown.classList.toggle('hidden');
+                };
+                document.onclick = () => userDropdown.classList.add('hidden');
+            }
+
+            const sidebar = document.getElementById('sidebar');
+            const collapseBtn = document.getElementById('collapseSidebarBtn');
+            const collapseIcon = document.getElementById('collapseIcon');
+            const texts = document.querySelectorAll('.sidebar-text');
+
+            if (collapseBtn) {
+                collapseBtn.onclick = () => {
+                    sidebar.classList.toggle('w-64');
+                    sidebar.classList.toggle('w-20');
+                    texts.forEach(t => t.classList.toggle('hidden'));
+                    collapseIcon.classList.toggle('fa-chevron-left');
+                    collapseIcon.classList.toggle('fa-chevron-right');
+                };
+            }
+        });
+    </script>
+
+</body>
+
+</html>

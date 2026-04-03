@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto pb-20">
+    <div class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6">
+        <div>
+            <span class="text-indigo-600 font-black text-[10px] uppercase tracking-[0.4em]">Auditoría de Movimientos</span>
+            <h1 class="text-4xl font-black text-gray-800 dark:text-white tracking-tighter mt-1">REPORTE DE ACCESOS</h1>
+        </div>
+        <div class="flex gap-3 no-print">
+            <button onclick="window.print()" class="px-5 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-[10px] font-black hover:bg-gray-50 transition-all flex items-center gap-2">
+                <i class="fa-solid fa-file-pdf text-red-500"></i> EXPORTAR PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-4xl border border-gray-100 dark:border-gray-700 shadow-sm mb-10">
+        <form method="GET" action="/reportes" class="flex flex-wrap items-center gap-4">
+            
+            <div class="flex-1 min-w-[250px] flex items-center gap-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-2xl px-6 h-16">
+                <i class="fa-solid fa-car-side text-indigo-500"></i>
+                <div class="flex flex-col w-full">
+                    <label class="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Buscar Placa / ID</label>
+                    <input type="text" name="placa_busqueda" placeholder="Ej: M6N-284..." value="{{ placa_busqueda }}" class="bg-transparent border-none p-0 text-sm font-bold dark:text-white focus:ring-0 placeholder:text-gray-300">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-6 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-2xl px-6 h-16">
+                <div class="flex flex-col">
+                    <label class="text-[9px] font-black text-indigo-500 uppercase">Desde</label>
+                    <input type="date" name="f_inicio" value="{{ f_inicio or '' }}" class="bg-transparent border-none p-0 text-sm font-bold dark:text-white focus:ring-0 w-32">
+                </div>
+                <div class="h-8 w-px bg-gray-200 dark:bg-gray-700"></div>
+                <div class="flex flex-col">
+                    <label class="text-[9px] font-black text-indigo-500 uppercase">Hasta</label>
+                    <input type="date" name="f_fin" value="{{ f_fin or '' }}" class="bg-transparent border-none p-0 text-sm font-bold dark:text-white focus:ring-0 w-32">
+                </div>
+            </div>
+
+            <button type="submit" class="h-16 px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-2xl shadow-xl shadow-indigo-100 dark:shadow-none transition-all flex items-center gap-3">
+                <i class="fa-solid fa-magnifying-glass"></i> FILTRAR
+            </button>
+            
+            <a href="/reportes" class="h-16 px-6 bg-gray-100 dark:bg-gray-700 text-gray-500 rounded-2xl flex items-center justify-center hover:bg-gray-200 transition-all">
+                <i class="fa-solid fa-rotate-left"></i>
+            </a>
+        </form>
+    </div>
+
+    {% if registros %}
+    <div class="mb-6 flex items-center gap-4">
+        <div class="bg-indigo-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase">
+            {{ registros|length }} Hallazgos
+        </div>
+        {% if placa_busqueda %}
+        <span class="text-xs font-bold text-gray-400">Mostrando historial para: <b class="text-indigo-500">{{ placa_busqueda }}</b></span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="bg-white dark:bg-gray-800 rounded-4xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="bg-gray-50/50 dark:bg-gray-700/30 border-b dark:border-gray-700">
+                    <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Evidencia</th>
+                    <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Identificación</th>
+                    <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Fecha</th>
+                    <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Hora</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
+                {% for reg in registros %}
+                <tr class="group hover:bg-indigo-50/20 dark:hover:bg-indigo-900/10 transition-all">
+                    <td class="px-8 py-4">
+                        <div class="w-24 h-12 rounded-lg overflow-hidden border dark:border-gray-600 shadow-inner bg-gray-100 dark:bg-gray-900">
+                            {% if reg.imagen %}
+                            <img src="data:image/jpeg;base64,{{ reg.imagen }}" class="w-full h-full object-cover">
+                            {% else %}
+                            <div class="flex items-center justify-center h-full text-[7px] font-black text-gray-300 uppercase">N/A</div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-8 py-4">
+                        <span class="text-[9px] font-mono text-gray-400 block mb-1">ID #{{ reg.id }}</span>
+                        <span class="text-sm font-black text-indigo-600 dark:text-indigo-400 uppercase">{{ reg.placa }}</span>
+                    </td>
+                    <td class="px-8 py-4 text-center text-sm font-bold text-gray-600 dark:text-gray-300">{{ reg.fecha }}</td>
+                    <td class="px-8 py-4 text-right text-sm text-gray-500">{{ reg.hora }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="px-8 py-24 text-center opacity-40">
+                        <i class="fa-solid fa-search text-4xl mb-4"></i>
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em]">No se encontraron coincidencias</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

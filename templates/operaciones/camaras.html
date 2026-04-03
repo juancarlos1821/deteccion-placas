@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block title %}Monitoreo en Vivo - GestiónPRO{% endblock %}
+
+{% block content %}
+
+<div class="flex w-full gap-4" style="height: 85vh;">
+
+    <div
+        class="flex-1 flex flex-col bg-black rounded-2xl shadow-2xl overflow-hidden relative border border-gray-800 h-full">
+
+        <div
+            class="absolute top-0 left-0 right-0 z-10 flex justify-between items-center p-4 bg-gradient-to-b from-black/80 to-transparent">
+            <div class="flex items-center gap-2">
+                <span class="flex h-3 w-3 relative">
+                    <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+                <span class="text-white font-bold tracking-wider text-sm">EN VIVO</span>
+            </div>
+            <div class="px-2 py-1 bg-black/40 rounded text-xs font-mono text-gray-300 border border-white/10">
+                CAM-01
+            </div>
+        </div>
+
+        <div class="flex-1 relative w-full h-full bg-black flex items-center justify-center overflow-hidden">
+            <img src="{{ url_for('video_feed') }}" class="w-full h-full object-contain bg-black">
+        </div>
+
+        <div
+            class="h-14 bg-gray-900 border-t border-gray-800 flex items-center justify-between px-4 shrink-0 z-20 relative">
+            <button
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-camera"></i> <span>FOTO</span>
+            </button>
+
+            <div class="flex gap-4 text-[10px] md:text-xs text-gray-400 font-mono">
+                <div class="flex items-center gap-1">
+                    <div class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div> YOLOv8
+                </div>
+                <div class="flex items-center gap-1">
+                    <div class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div> ACTIVO
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div
+        class="w-80 md:w-96 flex-none flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 h-full overflow-hidden">
+
+        <div
+            class="p-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center shrink-0">
+            <h3 class="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                <i class="fa-solid fa-list-ul text-indigo-500"></i> Detecciones
+            </h3>
+            <span
+                class="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-1 rounded-full font-bold border border-gray-200 dark:border-gray-600">HOY</span>
+        </div>
+
+        <div id="detections-container" class="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50 dark:bg-gray-900/30">
+            <p id="waiting-msg" class="text-center text-xs text-gray-400 mt-10 italic">Esperando vehículos...</p>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    /* Estilo barra de desplazamiento */
+    #detections-container::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    #detections-container::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 10px;
+    }
+
+    .dark #detections-container::-webkit-scrollbar-thumb {
+        background-color: #4b5563;
+    }
+
+    /* Animación para nuevos elementos */
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .detection-card {
+        animation: slideIn 0.4s ease-out forwards;
+    }
+</style>
+
+<script>
+    let ultimoIdProcesado = 0;
+
+    function verificarNuevasPlacas() {
+        fetch('/get_latest_detection')
+            .then(response => response.json())
+            .then(data => {
+                // Si hay datos y el ID es nuevo
+                if (data.imagen && data.id > ultimoIdProcesado) {
+                    ultimoIdProcesado = data.id;
+                    agregarTarjeta(data);
+                }
+            })
+            .catch(err => console.error("Error API:", err));
+    }
+
+    function agregarTarjeta(data) {
+        const contenedor = document.getElementById('detections-container');
+        const msgEspera = document.getElementById('waiting-msg');
+
+        // Ocultar mensaje de espera si existe
+        if (msgEspera) msgEspera.style.display = 'none';
+
+        // Creamos el div
+        const card = document.createElement('div');
+        // Usamos tus mismas clases de Tailwind + la clase de animación
+        card.className = "bg-white dark:bg-gray-700 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-600 flex gap-3 relative overflow-hidden group hover:border-indigo-300 transition-colors detection-card";
+
+        // HTML interno
+        card.innerHTML = `
+            <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-l"></div>
+            
+            <div class="w-20 h-12 bg-gray-100 dark:bg-gray-600 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border border-gray-200 dark:border-gray-500">
+                <img src="/static/capturas/${data.imagen}" class="w-full h-full object-contain" alt="Placa">
+            </div>
+            
+            <div class="flex-1 min-w-0 flex flex-col justify-center">
+                <div class="flex justify-between items-baseline">
+                    <h4 class="font-bold text-gray-800 dark:text-white text-sm">DETECTADO</h4>
+                    <span class="text-[10px] text-gray-400">${data.hora}</span>
+                </div>
+                <div class="flex justify-between items-center mt-0.5">
+                    <p class="text-[11px] text-gray-500 dark:text-gray-300">Cámara 01</p>
+                    <span class="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">NUEVO</span>
+                </div>
+            </div>
+        `;
+
+        // Insertar al inicio de la lista
+        contenedor.prepend(card);
+    }
+
+    // Ejecutar cada 1 segundo
+    setInterval(verificarNuevasPlacas, 1000);
+</script>
+
+{% endblock %}

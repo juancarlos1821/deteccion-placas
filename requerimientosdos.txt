@@ -1,0 +1,4 @@
+Flask==3.1.2
+gunicorn==21.2.0
+mysql-connector-python==9.5.0
+pandas==2.3.3

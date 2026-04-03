@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Control Vehicular UNPRG{% endblock %}
+
+{% block content %}
+<!-- Page Title -->
+<div class="mb-8">
+    <h1 class="text-2xl font-bold text-white tracking-tight">Resumen de Actividad</h1>
+    <p class="text-slate-500 text-sm mt-1">Panel de control del Sistema de Monitoreo Vehicular</p>
+</div>
+
+<!-- ===== SUMMARY CARDS ===== -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+
+    <!-- Card: Total Registros Hoy -->
+    <div class="glass-card rounded-2xl p-6 group">
+        <div class="flex items-center justify-between mb-4">
+            <div
+                class="w-11 h-11 rounded-xl bg-indigo-500/15 flex items-center justify-center border border-indigo-400/20 group-hover:bg-indigo-500/25 transition-colors">
+                <i class="fa-solid fa-database text-indigo-400"></i>
+            </div>
+            <span
+                class="text-[10px] font-semibold uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg">
+                <i class="fa-solid fa-arrow-up text-[8px] mr-1"></i>Hoy
+            </span>
+        </div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Registros</p>
+        <h3 class="text-3xl font-extrabold text-white mt-1 tracking-tight" id="totalRegistros">{{ total }}</h3>
+    </div>
+
+    <!-- Card: Vehículos en Tiempo Real -->
+    <div class="glass-card rounded-2xl p-6 group">
+        <div class="flex items-center justify-between mb-4">
+            <div
+                class="w-11 h-11 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-400/20 group-hover:bg-emerald-500/25 transition-colors">
+                <i class="fa-solid fa-car text-emerald-400"></i>
+            </div>
+            <span class="relative flex h-3 w-3">
+                <span
+                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+        </div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vehículos en Tiempo Real</p>
+        <h3 class="text-3xl font-extrabold text-emerald-400 mt-1 tracking-tight">Activo</h3>
+    </div>
+
+    <!-- Card: Última Detección -->
+    <div class="glass-card rounded-2xl p-6 group">
+        <div class="flex items-center justify-between mb-4">
+            <div
+                class="w-11 h-11 rounded-xl bg-violet-500/15 flex items-center justify-center border border-violet-400/20 group-hover:bg-violet-500/25 transition-colors">
+                <i class="fa-solid fa-crosshairs text-violet-400"></i>
+            </div>
+            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider" id="detHora">{{ ultima.hora
+                if ultima else '--:--' }}</span>
+        </div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Última Detección</p>
+        <h3 class="text-xl font-mono font-extrabold text-violet-400 mt-2 tracking-[0.2em]" id="detTexto">{{ ultima.placa
+            if ultima else 'SIN REGISTROS' }}</h3>
+    </div>
+</div>
+
+<!-- ===== CHART: Flujo de Vehículos por Hora ===== -->
+<div class="glass-card rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h4 class="font-bold text-white text-base" id="chartTitle">Flujo de Vehículos por Hora</h4>
+            <p class="text-slate-500 text-xs mt-0.5">Distribución de detecciones en las últimas 24 horas</p>
+        </div>
+        <div class="w-9 h-9 rounded-xl bg-indigo-500/15 flex items-center justify-center border border-indigo-400/20">
+            <i class="fa-solid fa-chart-bar text-indigo-400 text-sm"></i>
+        </div>
+    </div>
+    <div class="h-72">
+        <canvas id="flujoChart"></canvas>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const ctx = document.getElementById('flujoChart').getContext('2d');
+
+        // Gradient fill
+        const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)');
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0.02)');
+
+        const chartConfig = {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Vehículos detectados',
+                    data: [],
+                    backgroundColor: gradient,
+                    borderColor: 'rgba(129, 140, 248, 0.8)',
+                    borderWidth: 1.5,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    barPercentage: 0.6,
+                    categoryPercentage: 0.7,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 12, 41, 0.9)',
+                        titleColor: '#c7d2fe',
+                        bodyColor: '#e2e8f0',
+                        borderColor: 'rgba(129, 140, 248, 0.3)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 12,
+                        displayColors: false,
+                        titleFont: { weight: '600', size: 13 },
+                        bodyFont: { size: 12 },
+                        callbacks: {
+                            title: (items) => `🕐 ${items[0].label}`,
+                            label: (item) => `${item.raw} vehículos detectados`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: 'rgba(148,163,184,0.5)', font: { size: 11, weight: '500' } },
+                        border: { display: false }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.04)' },
+                        ticks: { color: 'rgba(148,163,184,0.5)', font: { size: 11 }, stepSize: 5 },
+                        border: { display: false },
+                        beginAtZero: true
+                    }
+                }
+            }
+        };
+
+        const flujoChart = new Chart(ctx, chartConfig);
+
+        // Fetch real data from API
+        function loadChartData() {
+            fetch('/api/flujo-vehicular')
+                .then(r => r.json())
+                .then(data => {
+                    flujoChart.data.labels = data.labels;
+                    flujoChart.data.datasets[0].data = data.data;
+
+                    // Calculate total and update title
+                    const totalAutos = data.data.reduce((a, b) => a + b, 0);
+                    document.getElementById('chartTitle').textContent = `Tráfico de hoy: ${totalAutos} autos`;
+
+                    // Dynamic Y-axis max (20% padding)
+                    const maxVal = Math.max(...data.data);
+                    flujoChart.options.scales.y.suggestedMax = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 10;
+
+                    flujoChart.update();
+                })
+                .catch(() => { });
+        }
+        loadChartData();
+        // Refresh chart every 30 seconds
+        setInterval(loadChartData, 30000);
+
+        // --- Live data from /get_latest_detection ---
+        function updateDetection() {
+            fetch('/get_latest_detection')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.texto) {
+                        document.getElementById('detTexto').textContent = data.texto;
+                    }
+                    if (data.hora) {
+                        document.getElementById('detHora').textContent = data.hora;
+                    }
+                    // totalRegistros se carga desde el servidor (no del contador en memoria)
+                })
+                .catch(() => { });
+        }
+        updateDetection();
+        setInterval(updateDetection, 3000);
+    });
+</script>
+{% endblock %}

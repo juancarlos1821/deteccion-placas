@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+
+{% block title %}Historial de Accesos - Control UNPRG{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i>
+                Historial de Detecciones
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">Últimos {{ limit }} registros del sistema de monitoreo</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <form action="{{ url_for('historial') }}" method="get" class="flex items-center">
+                <div
+                    class="flex items-center gap-2 bg-indigo-500/10 px-3 py-2.5 rounded-xl border border-indigo-400/20 hover:border-indigo-400/40 transition-colors">
+                    <label for="limit"
+                        class="text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer">Mostrar:</label>
+                    <select name="limit" id="limit" onchange="this.form.submit()"
+                        class="bg-transparent text-indigo-400 text-sm font-bold focus:outline-none cursor-pointer appearance-none pr-6 relative z-10"
+                        style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%20viewBox%3D%220%200%20292.4%20292.4%22%3E%3Cpath%20fill%3D%22%23818cf8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right center; background-size: 0.65em;">
+                        <option class="bg-slate-900 text-slate-300" value="10" {% if limit==10 %}selected{% endif %}>10
+                        </option>
+                        <option class="bg-slate-900 text-slate-300" value="25" {% if limit==25 %}selected{% endif %}>25
+                        </option>
+                        <option class="bg-slate-900 text-slate-300" value="50" {% if limit==50 %}selected{% endif %}>50
+                        </option>
+                        <option class="bg-slate-900 text-slate-300" value="100" {% if limit==100 %}selected{% endif %}>
+                            100</option>
+                    </select>
+                </div>
+            </form>
+
+            <a href="{{ url_for('reportes') }}"
+                class="inline-flex items-center gap-2 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 border border-indigo-400/20 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]">
+                <i class="fa-solid fa-file-export text-xs"></i> Reportes
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Card -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        <div class="glass-card rounded-2xl p-6 group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Registros</p>
+                    <p class="text-2xl font-extrabold text-white mt-1">{{ detecciones|length }}</p>
+                </div>
+                <div
+                    class="w-11 h-11 rounded-xl bg-indigo-500/15 flex items-center justify-center border border-indigo-400/20 group-hover:bg-indigo-500/25 transition-colors">
+                    <i class="fa-solid fa-database text-indigo-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="glass-card rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-white/[0.06]">
+                        <th class="p-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">ID</th>
+                        <th class="p-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Vehículo</th>
+                        <th class="p-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Fecha</th>
+                        <th class="p-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Hora</th>
+                        <th class="p-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest text-center">
+                            Captura</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/[0.04]">
+                    {% for registro in detecciones %}
+                    <tr class="hover:bg-white/[0.03] transition-colors">
+                        <td class="p-4 text-sm font-medium text-slate-300">#{{ registro.id }}</td>
+                        <td class="p-4">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center border border-indigo-400/20">
+                                    <i class="fa-solid fa-car text-xs text-indigo-400"></i>
+                                </div>
+                                <span class="font-semibold text-white text-sm">{{ registro.placa }}</span>
+                            </div>
+                        </td>
+                        <td class="p-4 text-sm text-slate-400">
+                            <i class="fa-regular fa-calendar mr-1.5 text-slate-600"></i>{{ registro.fecha }}
+                        </td>
+                        <td class="p-4 text-sm text-slate-400">
+                            <i class="fa-regular fa-clock mr-1.5 text-slate-600"></i>{{ registro.hora }}
+                        </td>
+                        <td class="p-4 text-center">
+                            {% if registro.imagen %}
+                            <button
+                                onclick="openImageModal('{{ url_for('static', filename='capturas/' + registro.imagen) }}', '{{ registro.placa }}')"
+                                class="group relative inline-block overflow-hidden rounded-lg border border-white/10 hover:border-indigo-400/40 transition-all hover:shadow-lg hover:shadow-indigo-500/10">
+                                <img src="{{ url_for('static', filename='capturas/' + registro.imagen) }}"
+                                    alt="Captura {{ registro.placa }}"
+                                    class="h-12 w-20 object-cover transform group-hover:scale-110 transition-transform duration-300">
+                                <div
+                                    class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <i class="fa-solid fa-magnifying-glass-plus text-white text-sm"></i>
+                                </div>
+                            </button>
+                            {% else %}
+                            <span class="text-xs text-slate-600 italic">Sin imagen</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="p-12 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <div
+                                    class="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4 border border-white/[0.06]">
+                                    <i class="fa-regular fa-folder-open text-2xl text-slate-600"></i>
+                                </div>
+                                <p class="text-slate-500 text-sm">No hay detecciones registradas aún.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-4 border-t border-white/[0.06] text-xs text-slate-600 text-center">
+            Mostrando los últimos {{ limit }} registros. Para más detalles, vaya a
+            <a href="{{ url_for('reportes') }}"
+                class="text-indigo-400 hover:text-indigo-300 transition-colors">Reportes</a>.
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div id="imageModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+    onclick="closeImageModal()">
+    <div class="relative max-w-4xl w-full glass-card rounded-2xl overflow-hidden" onclick="event.stopPropagation()">
+        <div class="p-4 border-b border-white/[0.06] flex justify-between items-center">
+            <h3 class="font-bold text-base text-white flex items-center gap-2">
+                <i class="fa-solid fa-camera text-indigo-400"></i>
+                Captura: <span id="modalPlaca" class="text-indigo-400"></span>
+            </h3>
+            <button onclick="closeImageModal()"
+                class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-colors border border-white/[0.06]">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="p-2 bg-black/50 flex justify-center">
+            <img id="modalImage" src="" alt="Captura Grande" class="max-h-[70vh] rounded-xl">
+        </div>
+    </div>
+</div>
+
+<script>
+    function openImageModal(imgSrc, placa) {
+        document.getElementById('modalImage').src = imgSrc;
+        document.getElementById('modalPlaca').textContent = placa;
+        document.getElementById('imageModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeImageModal() {
+        document.getElementById('imageModal').classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === "Escape") closeImageModal();
+    });
+</script>
+{% endblock %}

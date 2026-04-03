@@ -1,0 +1,21 @@
+# Entornos virtuales
+.venv/
+
+# Archivos de entorno
+.env
+
+# Node
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Archivos pesados
+*.mp4
+*.jpg
+*.jpeg
+*.png
+
+# Configuración
+.vscode/
