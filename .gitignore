@@ -20,3 +20,8 @@ __pycache__/
 
 # Configuración
 .vscode/
+# Salidas de las pruebas de comparacion de motores
+recortes_test/
+prueba_subida.jpg
+runs/
+ai_models/yolov8s/best.onnx

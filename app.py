@@ -3,7 +3,6 @@ from functools import wraps
 import uuid
 from datetime import timedelta
 import cv2
-from ultralytics import YOLO
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
@@ -12,8 +11,9 @@ import base64
 import numpy as np
 import time
 import re
-from paddleocr import PaddleOCR
 import os
+
+from inferencia import DetectorPlacas, LectorPlacas
 
 # Cargar variables de entorno desde .env (credenciales de Supabase)
 load_dotenv()
@@ -22,15 +22,11 @@ load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "ai_models", "Paddleocr")
 
-# ←←← AQUÍ ESTÁ EL CAMBIO IMPORTANTE ←←←
-ocr = PaddleOCR(
-    use_angle_cls=True,          # si usas detección de ángulo
-    lang='latin',                # o 'en' según lo que entrenaste
-    rec_model_dir=MODEL_DIR,     # ← carpeta con tus inference.*
-    rec_char_dict_path=os.path.join(MODEL_DIR, "dict_cix.txt"),  # ← tu diccionario custom
-    show_log=False,              # para que no llene la consola
-    det_model_dir=None,          # si solo usas reconocimiento (recomendado si ya tienes det en YOLO)
-)
+# El lector de placas corre sobre ONNX Runtime en vez de PaddleOCR. Es el
+# mismo modelo que entrenaste, convertido con paddle2onnx: se comprobó que
+# devuelve exactamente el mismo texto. Lo que cambia es que ya no hace falta
+# PaddlePaddle (299 MB), y con eso la app cabe en un servidor gratuito.
+lector = LectorPlacas()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "tu_clave_secreta_super_segura")
@@ -121,18 +117,34 @@ def sesion_invitado(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# 1. INICIALIZACIÓN DE MODELO YOLO
+# 1. INICIALIZACIÓN DE MODELOS
 # ------------------------------------------------------
-from ultralytics import YOLO
-
-print("Cargando modelo YOLO...")
+# Detector sobre ONNX Runtime: es el que usa la subida de imágenes, o sea la
+# demo pública. Comparado con ultralytics sobre 12 escenas, encuentra las
+# mismas placas con desviaciones de 0 a 5 px.
+print("Cargando detector ONNX...")
 try:
-    # Construimos la ruta dinámica: D:\loginflask\ai_models\yolov8s\bestsmall.pt
-    ruta_yolo = os.path.join(BASE_DIR, "ai_models", "yolov8s", "bestsmall.pt")
-    model = YOLO(ruta_yolo)  
-    print(f"¡Modelo {ruta_yolo} cargado con éxito!")
+    detector = DetectorPlacas()
+    print("Detector ONNX cargado con éxito.")
 except Exception as e:
-    print(f"Error: No se encontró el modelo. Detalle: {e}")
+    print(f"Error: no se pudo cargar el detector ONNX. Detalle: {e}")
+    detector = None
+
+# El vídeo en directo necesita `model.track()`, el rastreador de ultralytics,
+# que asigna un ID a cada vehículo entre fotogramas. Eso no tiene equivalente
+# en ONNX, así que se carga solo si la librería está disponible.
+#
+# En el servidor de la demo no se instala (arrastra PyTorch, 468 MB) y esa
+# función queda desactivada; en local, con el entorno completo, sigue igual.
+try:
+    from ultralytics import YOLO
+
+    ruta_yolo = os.path.join(BASE_DIR, "ai_models", "yolov8s", "bestsmall.pt")
+    model = YOLO(ruta_yolo)
+    print("Modelo de seguimiento (vídeo) disponible.")
+except Exception as e:
+    print(f"Seguimiento de vídeo no disponible ({type(e).__name__}). "
+          "La subida de imágenes funciona igual.")
     model = None
 
 # ------------------------------------------------------
@@ -418,13 +430,11 @@ def generate_frames(usuario_id):
 
                         # --- OCR ---
                         try:
-                            ocr_result = ocr.ocr(recorte, det=False, cls=True)
+                            raw_text, _ = lector.leer(recorte)
                             plate_text = "DESCONOCIDO"
-                            
-                            if ocr_result and ocr_result[0] and len(ocr_result[0]) > 0:
-                                raw_text = ocr_result[0][0][0]
-                                if raw_text:
-                                    plate_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper())
+
+                            if raw_text:
+                                plate_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper())
 
                             # Marcar como capturado
                             autos_ya_capturados.add(obj_id)
@@ -582,8 +592,9 @@ def perfil():
 
 # ------------------------------------------------------------
 # 6. SUBIDA DE IMÁGENES (flujo principal de la demo del portafolio)
-# El visitante sube una foto, YOLO localiza las placas, PaddleOCR
-# lee el texto y todo queda guardado en SU sesión.
+# El visitante sube una foto, el detector ONNX localiza las placas, el lector
+# ONNX transcribe el texto y todo queda guardado en SU sesión. Ambos modelos
+# son los mismos de siempre; solo cambió el motor que los ejecuta.
 # ------------------------------------------------------------
 EXTENSIONES_PERMITIDAS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp'}
 MAX_TAMANO_MB = 10
@@ -594,9 +605,13 @@ def procesar_imagen_subida(img, usuario_id):
     resultados = []
     anotada = img.copy()
 
-    detecciones_yolo = model(img, conf=0.4, verbose=False)
-    boxes = detecciones_yolo[0].boxes
-    if boxes is None or len(boxes) == 0:
+    if detector is None:
+        return [], None
+
+    # Ya vienen como (x1, y1, x2, y2, confianza) en coordenadas de la imagen
+    # original y ordenadas de izquierda a derecha.
+    detecciones = detector.detectar(img)
+    if not detecciones:
         return [], None
 
     now = datetime.datetime.now()
@@ -605,9 +620,7 @@ def procesar_imagen_subida(img, usuario_id):
 
     conn = get_db_connection()
     try:
-        for i, box in enumerate(boxes.xyxy.int().cpu().tolist()):
-            x1, y1, x2, y2 = box
-            conf = float(boxes.conf[i])
+        for i, (x1, y1, x2, y2, conf) in enumerate(detecciones):
 
             alto, ancho = img.shape[:2]
             x1, y1 = max(0, x1), max(0, y1)
@@ -622,11 +635,9 @@ def procesar_imagen_subida(img, usuario_id):
             # OCR sobre el recorte de la placa
             plate_text = "DESCONOCIDO"
             try:
-                ocr_result = ocr.ocr(recorte, det=False, cls=True)
-                if ocr_result and ocr_result[0] and len(ocr_result[0]) > 0:
-                    raw_text = ocr_result[0][0][0]
-                    if raw_text:
-                        plate_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper()) or "DESCONOCIDO"
+                raw_text, _ = lector.leer(recorte)
+                if raw_text:
+                    plate_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper()) or "DESCONOCIDO"
             except Exception as e:
                 print(f"Error en OCR de imagen subida: {e}")
 
@@ -684,7 +695,7 @@ def subir():
             error = "Selecciona una imagen primero."
         elif os.path.splitext(archivo.filename)[1].lower() not in EXTENSIONES_PERMITIDAS:
             error = "Formato no soportado. Usa JPG, PNG, WEBP o BMP."
-        elif not model:
+        elif not detector:
             error = "El modelo de detección no está disponible."
         else:
             data = archivo.read()

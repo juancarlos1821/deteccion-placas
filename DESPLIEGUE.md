@@ -1,79 +1,73 @@
-# Desplegar la demo en Hugging Face Spaces
+# Desplegar la demo (gratis, sin tarjeta)
 
-La demo pública es **subir una foto y ver la placa detectada** (`/subir`), que ya
+La demo publica es **subir una foto y ver la placa detectada** (`/subir`), que
 funciona sin registro gracias al decorador `@sesion_invitado`.
 
-El streaming de vídeo (`/video_feed`) queda fuera: depende de `muni03.mp4`, que
-no está en el repositorio, y transmitir vídeo a visitantes arbitrarios consume
-mucho más de lo que da un plan gratuito.
+## Por que cabe en un plan gratuito
 
-## Antes de empezar
+La inferencia se migro de PyTorch + PaddlePaddle a **ONNX Runtime**. Los
+modelos son los mismos; solo cambio el motor que los ejecuta.
 
-Sube a GitHub lo que tienes pendiente, sobre todo `templates/subir.html`, que
-está sin trackear. Sin ese archivo la demo no tiene página.
+| | Antes | Ahora |
+|---|---|---|
+| Deteccion | ultralytics + torch (468 MB) | onnxruntime (45 MB) |
+| OCR | paddleocr + paddle (299 MB) | el mismo onnxruntime |
+| Paquetes | 85 | 8 |
+| RAM en el pico | ~1,5 GB | **236 MB** |
 
-```bash
-git add templates/subir.html app.py requirements.txt database.sql database_supabase.sql Dockerfile .dockerignore DESPLIEGUE.md
-git commit -m "Modo invitado, esquema de base de datos y configuracion de despliegue"
-git push
-```
+Render da 512 MB gratis, asi que entra con margen.
 
-## Crear el Space
+La equivalencia esta verificada, no supuesta:
 
-1. Entra en <https://huggingface.co/new-space>.
-2. Nombre: `deteccion-placas`. Licencia: la que prefieras.
-3. **Space SDK: Docker** → plantilla *Blank*.
-4. Hardware: *CPU basic*, gratuito (2 vCPU, 16 GB de RAM).
-5. Visibilidad: *Public*, para que el enlace del portafolio funcione.
+- `comparar_motores.py` — el OCR devuelve el mismo texto que PaddleOCR (2 de 2).
+- `comparar_deteccion.py` — 12 escenas: mismo numero de cajas, desviacion de 0
+  a 5 px sobre imagenes de 1280 px.
 
-## Subir el código
+## Desplegar en Render
 
-```bash
-git remote add space https://huggingface.co/spaces/juancarlos1821/deteccion-placas
-git push space main
-```
+1. Entra en <https://render.com> y crea una cuenta (no pide tarjeta).
+2. **New → Web Service** y conecta el repositorio de GitHub.
+3. Render detecta el `Dockerfile` solo. Si pregunta, elige **Docker**.
+4. Plan: **Free**.
+5. **Create Web Service**.
 
-Los modelos (`ai_models/`) pesan 36 MB en total, así que entran sin problema.
+La primera construccion tarda unos minutos. Cuando termine tendras una URL del
+estilo `https://deteccion-placas.onrender.com`.
 
-## Configurar las credenciales (opcional)
+## Credenciales (opcional)
 
-**La demo funciona sin base de datos.** Si Supabase no responde, la aplicación
-entra en modo demo: detecta la placa y muestra el resultado igual, y lo único
-que no hace es guardar el historial. Esto importa porque el plan gratuito de
-Supabase pausa los proyectos inactivos — sin esa tolerancia, un reclutador
-podría abrir tu demo y encontrarse un error.
+**La demo funciona sin base de datos.** Si Supabase no responde, la aplicacion
+entra en modo demo: detecta la placa y muestra el resultado igual, y lo unico
+que no hace es guardar el historial. Importa porque el plan gratuito de
+Supabase pausa los proyectos inactivos.
 
-Así que puedes desplegar primero y configurar esto después.
+Para tener historial y reportes, en Render ve a *Environment* y anade las
+variables de tu `.env`:
 
-Para tener historial y reportes, en el Space ve a *Settings → Variables and
-secrets* y añade como **Secrets** los mismos valores de tu `.env`:
-
-- `SUPABASE_DB_HOST`
-- `SUPABASE_DB_PORT`
-- `SUPABASE_DB_USER`
-- `SUPABASE_DB_PASSWORD`
-- `SUPABASE_DB_NAME`
+- `SUPABASE_DB_HOST`, `SUPABASE_DB_PORT`, `SUPABASE_DB_USER`,
+  `SUPABASE_DB_PASSWORD`, `SUPABASE_DB_NAME`
 - `SECRET_KEY`
 
-Nunca los pongas en el `Dockerfile` ni los subas al repositorio.
+Nunca las pongas en el `Dockerfile` ni las subas al repositorio.
 
 ## Conectar con el portafolio
 
-Cuando el Space esté en verde, copia su URL (tiene la forma
-`https://juancarlos1821-deteccion-placas.hf.space`) y pégala en el portafolio,
-en `lib/proyectos.ts`:
+Copia la URL y pegala en `lib/proyectos.ts` del portafolio:
 
 ```ts
-enlaceDemo: "https://juancarlos1821-deteccion-placas.hf.space",
-estado: "En línea",
+enlaceDemo: "https://deteccion-placas.onrender.com/subir",
+estado: "En linea",
 ```
 
-El botón **Ir a demo** aparece solo.
+El boton **Ir a demo** aparece solo.
 
 ## Notas
 
-- El primer arranque tarda: instalar torch y paddlepaddle lleva varios minutos.
-- Un Space gratuito se duerme tras un rato sin visitas y tarda unos segundos en
-  despertar. Para un portafolio es aceptable.
-- `static/capturas/` es efímero: se borra en cada reinicio. No pasa nada, las
-  detecciones quedan registradas en la base de datos.
+- El plan gratuito de Render duerme el servicio tras 15 minutos sin visitas. La
+  primera peticion despues tarda entre 30 y 60 segundos en responder.
+- `static/capturas/` es efimero: se borra en cada reinicio. Las detecciones
+  quedan en la base de datos si esta configurada.
+- **El video en directo no esta disponible en el servidor.** Usa
+  `model.track()` de ultralytics, que necesita PyTorch, y ademas depende de un
+  `muni03.mp4` que no esta en el repositorio. En local, con
+  `pip install ultralytics torch`, la app lo detecta y lo activa sola.

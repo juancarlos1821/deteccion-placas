@@ -1,12 +1,11 @@
-# Imagen para desplegar la demo en Hugging Face Spaces (SDK: Docker).
+# Imagen para desplegar la demo. Sirve para Render, Fly, Cloud Run o cualquier
+# plataforma que acepte un Dockerfile: el puerto se lee del entorno.
 FROM python:3.10-slim
 
-# OpenCV no arranca sin estas librerías del sistema: `import cv2` falla con
-# "libGL.so.1: cannot open shared object file".
-RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+# OpenCV necesita glib aunque sea la variante headless.
+RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 && rm -rf /var/lib/apt/lists/*
 
-# Spaces ejecuta el contenedor con el usuario 1000; sin esto, la app no puede
-# escribir las imágenes anotadas.
+# Usuario sin privilegios: la app escribe los recortes en static/capturas.
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user
@@ -14,18 +13,17 @@ ENV PATH=/home/user/.local/bin:$PATH
 WORKDIR /home/user/app
 
 COPY --chown=user requirements.txt .
-
-# torch y torchvision desde el índice de CPU. La rueda por defecto de PyPI trae
-# CUDA: más de 2 GB de GPU que en un Space gratuito no se usan para nada.
-RUN pip install --no-cache-dir --user --index-url https://download.pytorch.org/whl/cpu torch==2.9.1 torchvision==0.24.1
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 COPY --chown=user . .
 
-# Spaces publica el contenedor en el 7860. FLASK_DEBUG=0 es obligatorio: el
-# depurador de Werkzeug permite ejecutar código arbitrario desde el navegador.
-ENV PORT=7860
+# Nunca en produccion: el depurador de Werkzeug permite ejecutar codigo
+# arbitrario desde el navegador.
 ENV FLASK_DEBUG=0
-EXPOSE 7860
+ENV PORT=8080
+EXPOSE 8080
 
-CMD ["python", "app.py"]
+# UN SOLO worker, y es deliberado: cada worker carga su propia copia de los
+# modelos ONNX (~236 MB). Con dos, se pasa del limite de 512 MB del plan
+# gratuito. La concurrencia se resuelve con hilos, que comparten memoria.
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 4 --timeout 120 app:app
