@@ -1,9 +1,12 @@
 from flask import Flask, render_template, Response, url_for, request, redirect, session, jsonify, flash
-from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import uuid
+from datetime import timedelta
 import cv2
 from ultralytics import YOLO
-import mysql.connector 
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
 import datetime
 import base64
 import numpy as np
@@ -11,6 +14,9 @@ import time
 import re
 from paddleocr import PaddleOCR
 import os
+
+# Cargar variables de entorno desde .env (credenciales de Supabase)
+load_dotenv()
 
 # Ruta absoluta (más segura)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,14 +33,91 @@ ocr = PaddleOCR(
 )
 
 app = Flask(__name__)
-app.secret_key = "tu_clave_secreta_super_segura"
+app.secret_key = os.environ.get("SECRET_KEY", "tu_clave_secreta_super_segura")
+# La cookie de sesión del visitante dura 30 días: si el reclutador
+# vuelve otro día con el mismo navegador, recupera su misma demo.
+app.permanent_session_lifetime = timedelta(days=30)
 
-# Decorador para proteger rutas
-def login_required(f):
+# ------------------------------------------------------------
+# SESIÓN AUTOMÁTICA DE INVITADO (sin registro ni login)
+# Cada visitante queda identificado por un UUID guardado en su
+# navegador. La primera vez se crea su fila en "usuarios" y se
+# registra la visita para el contador del portafolio.
+# ------------------------------------------------------------
+def registrar_visita_diaria():
+    """Suma una visita al contador (máximo una por día por visitante)."""
+    hoy = datetime.date.today().isoformat()
+    if session.get('ultima_visita') == hoy:
+        return
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO visitas (session_id) VALUES (%s)",
+                           (session['session_uuid'],))
+            cursor.execute("UPDATE usuarios SET ultima_actividad = now() WHERE id = %s",
+                           (session['usuario_id'],))
+            conn.commit()
+            cursor.close()
+        finally:
+            conn.close()
+    session['ultima_visita'] = hoy
+
+def get_usuario_id():
+    """Devuelve el id del visitante actual, creando su sesión si es nuevo.
+
+    Puede devolver None, y no es un error: es el "modo demo", que se activa
+    cuando la base de datos no responde. La detección de placas —que es lo que
+    se quiere enseñar— sigue funcionando; lo único que se pierde es guardar el
+    historial. El plan gratuito de Supabase pausa los proyectos inactivos, así
+    que sin esto la demo podría recibir a un visitante con un error.
+    """
+    # Se comprueba el valor, no la clave: si en la visita anterior no había
+    # base de datos quedó guardado un None, y conviene reintentar por si ya
+    # volvió.
+    if session.get('usuario_id') is not None:
+        registrar_visita_diaria()
+        return session['usuario_id']
+
+    conn = get_db_connection()
+    if not conn:
+        session.permanent = True
+        session['usuario_id'] = None
+        session['usuario'] = 'Invitado'
+        return None
+
+    session_uuid = str(uuid.uuid4())
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            "INSERT INTO usuarios (session_id) VALUES (%s) "
+            "ON CONFLICT (session_id) DO UPDATE SET ultima_actividad = now() "
+            "RETURNING id",
+            (session_uuid,)
+        )
+        usuario_id = cursor.fetchone()['id']
+        cursor.execute("INSERT INTO visitas (session_id) VALUES (%s)", (session_uuid,))
+        conn.commit()
+        cursor.close()
+    finally:
+        conn.close()
+
+    session.permanent = True
+    session['usuario_id'] = usuario_id
+    session['session_uuid'] = session_uuid
+    session['usuario'] = 'Invitado'
+    session['ultima_visita'] = datetime.date.today().isoformat()
+    return usuario_id
+
+# Decorador: garantiza que el visitante tenga sesión antes de entrar
+def sesion_invitado(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
+        # Antes esto respondía 503 si la base de datos no contestaba, y dejaba
+        # la demo inservible justo delante de quien venía a probarla. Ahora se
+        # entra igual: `get_usuario_id()` deja preparada una sesión sin
+        # persistencia y deja `session['usuario_id']` a None.
+        get_usuario_id()
         return f(*args, **kwargs)
     return decorated_function
 
@@ -71,127 +154,71 @@ autos_ya_capturados = set() # Guardaremos los IDs de YOLO que ya fueron procesad
 # ------------------------------------------------------
 def get_db_connection():
     try:
-        connection = mysql.connector.connect(
-            host='127.0.0.1',
-            user='root',
-            password='',
-            database='control_vehicular'
+        connection = psycopg2.connect(
+            host=os.environ.get('SUPABASE_DB_HOST'),
+            port=os.environ.get('SUPABASE_DB_PORT', '6543'),
+            user=os.environ.get('SUPABASE_DB_USER'),
+            password=os.environ.get('SUPABASE_DB_PASSWORD'),
+            dbname=os.environ.get('SUPABASE_DB_NAME', 'postgres'),
+            sslmode='require'
         )
         return connection
-    except mysql.connector.Error as err:
-        print(f"Error conectando a MySQL: {err}")
+    except psycopg2.Error as err:
+        print(f"Error conectando a Supabase: {err}")
         return None
 
 # ------------------------------------------------------
 # 4. RUTAS DE NAVEGACIÓN
 # ------------------------------------------------------
 
-@app.route('/', methods=['GET', 'POST'])
-def login():
-    error = None
-    if request.method == 'POST':
-        username_form = request.form['username']
-        password_form = request.form['password']
-        conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor(dictionary=True) 
-            # CONSULTA PARAMETRIZADA (OK)
-            cursor.execute('SELECT * FROM usuarios WHERE username = %s', (username_form,))
-            user = cursor.fetchone()
-            cursor.close()
-            conn.close()
-
-            # Verificación de contraseña con Hash
-            if user and check_password_hash(user['password'], password_form):
-                session.clear() # Limpiar sesión anterior por seguridad
-                session['user_id'] = user['id']
-                session['usuario'] = user['username']
-                return redirect(url_for('home'))
-            
-            flash('Credenciales inválidas')
-    return render_template('auth/login.html')
+@app.route('/')
+def index():
+    # Sin login: el visitante entra directo al dashboard y su
+    # sesión de invitado se crea sola en el camino.
+    return redirect(url_for('home'))
 
 @app.route('/home')
-@login_required
+@sesion_invitado
 def home():
+    usuario_id = session['usuario_id']
     total = 0
     ultima = None
     conn = get_db_connection()
     if conn:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT COUNT(*) AS total FROM detecciones")
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT COUNT(*) AS total FROM detecciones WHERE usuario_id = %s",
+                       (usuario_id,))
         resultado = cursor.fetchone()
         total = resultado['total'] if resultado else 0
 
-        cursor.execute("SELECT placa, hora FROM detecciones ORDER BY id DESC LIMIT 1")
+        cursor.execute("SELECT placa, hora FROM detecciones WHERE usuario_id = %s ORDER BY id DESC LIMIT 1",
+                       (usuario_id,))
         ultima = cursor.fetchone()
         cursor.close()
         conn.close()
     return render_template('home.html', total=total, ultima=ultima)
 
 @app.route('/camaras')
-@login_required
+@sesion_invitado
 def camaras():
     return render_template('operaciones/camaras.html')
 
-@app.route('/forgot-password')
-def forgot_password():
-    return render_template('auth/forgot_password.html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        confirm_password = request.form.get('confirm_password', '')
-
-        # Validación servidor: contraseñas deben coincidir
-        if password != confirm_password:
-            flash('Las contraseñas no coinciden.')
-            return redirect(url_for('register'))
-        
-        conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor(dictionary=True)
-            
-            # Verificar si existe
-            cursor.execute('SELECT * FROM usuarios WHERE username = %s', (username,))
-            existing_user = cursor.fetchone()
-            
-            if existing_user:
-                flash('El nombre de usuario ya existe')
-                cursor.close()
-                conn.close()
-                return redirect(url_for('register'))
-            
-            # Crear usuario con hash
-            hashed_password = generate_password_hash(password)
-            cursor.execute('INSERT INTO usuarios (username, password) VALUES (%s, %s)', (username, hashed_password))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            
-            flash('Usuario creado exitosamente. Por favor inicia sesión.')
-            return redirect(url_for('login'))
-            
-    return render_template('auth/register.html')
-
 @app.route('/reportes', methods=['GET'])
-@login_required
+@sesion_invitado
 def reportes():
     # 1. Obtenemos los valores (strip elimina espacios accidentales)
     placa_busqueda = request.args.get('placa_busqueda', '').strip()
     f_inicio = request.args.get('f_inicio', '').strip()
     f_fin = request.args.get('f_fin', '').strip()
-    
+
     registros = []
     conn = get_db_connection()
-    
+
     if conn:
-        cursor = conn.cursor(dictionary=True)
-        # 2. Iniciamos la consulta base
-        query = "SELECT id, placa, fecha, hora, imagen FROM detecciones WHERE 1=1"
-        params = []
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # 2. Consulta base: solo las detecciones de ESTE visitante
+        query = "SELECT id, placa, fecha, hora, imagen FROM detecciones WHERE usuario_id = %s"
+        params = [session['usuario_id']]
 
         # 3. Filtro de Placa (Si el usuario escribió algo)
         if placa_busqueda:
@@ -229,8 +256,10 @@ def reportes():
 
 @app.route('/logout')
 def logout():
-    session.pop('usuario', None)
-    return redirect(url_for('login'))
+    # "Reiniciar demo": borra la sesión del navegador; al volver a
+    # cargar cualquier página se crea un visitante nuevo desde cero.
+    session.clear()
+    return redirect(url_for('home'))
 
 # ------------------------------------------------------
 # 5. LÓGICA DE VIDEO EN TIEMPO REAL (ESPERA 3 SEGUNDOS Y TOMA MEJOR CONFIDENCIA)
@@ -238,7 +267,7 @@ def logout():
 import time
 from collections import defaultdict
 
-def generate_frames():
+def generate_frames(usuario_id):
     global ultima_placa, contador_id, autos_ya_capturados
 
     camera = cv2.VideoCapture("muni03.mp4")
@@ -434,9 +463,9 @@ def generate_frames():
                                 if conn:
                                     cursor = conn.cursor()
                                     cursor.execute(
-                                        "INSERT INTO detecciones (placa, fecha, hora, imagen, confianza, track_id, tiempo_observacion) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                                        (plate_text, now.strftime('%Y-%m-%d'), 
-                                         now.strftime('%H:%M:%S'), filename, 
+                                        "INSERT INTO detecciones (usuario_id, placa, fecha, hora, imagen, confianza, track_id, tiempo_observacion) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                                        (usuario_id, plate_text, now.strftime('%Y-%m-%d'),
+                                         now.strftime('%H:%M:%S'), filename,
                                          mejor_conf, obj_id, tiempo_transcurrido)
                                     )
                                     conn.commit()
@@ -488,7 +517,7 @@ def get_latest_detection():
     return jsonify(ultima_placa)
 
 @app.route('/api/flujo-vehicular')
-@login_required
+@sesion_invitado
 def api_flujo_vehicular():
     """Devuelve detecciones agrupadas por hora del día actual para el gráfico."""
     hoy = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -497,11 +526,11 @@ def api_flujo_vehicular():
 
     conn = get_db_connection()
     if conn:
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute(
-            "SELECT SUBSTRING(hora, 1, 2) AS h, COUNT(*) AS total "
-            "FROM detecciones WHERE fecha = %s GROUP BY h ORDER BY h",
-            (hoy,)
+            "SELECT EXTRACT(HOUR FROM hora) AS h, COUNT(*) AS total "
+            "FROM detecciones WHERE fecha = %s AND usuario_id = %s GROUP BY h ORDER BY h",
+            (hoy, session['usuario_id'])
         )
         for row in cursor.fetchall():
             clave = f"{int(row['h']):02d}:00"
@@ -515,7 +544,7 @@ def api_flujo_vehicular():
     return jsonify({"labels": labels, "data": values})
 
 @app.route('/historial')
-@login_required
+@sesion_invitado
 def historial():
     # Límite dinámico desde el query string, con validación
     limite_permitidos = [10, 25, 50, 100]
@@ -526,8 +555,9 @@ def historial():
     conn = get_db_connection()
     detecciones = []
     if conn:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, placa, fecha, hora, imagen FROM detecciones ORDER BY id DESC LIMIT %s", (limit,))
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT id, placa, fecha, hora, imagen FROM detecciones WHERE usuario_id = %s ORDER BY id DESC LIMIT %s",
+                       (session['usuario_id'], limit))
         detecciones = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -535,15 +565,154 @@ def historial():
 
 
 @app.route('/video_feed')
+@sesion_invitado
 def video_feed():
     """Ruta que sirve el stream de video con detección de placas"""
-    return Response(generate_frames(), 
+    # Capturamos el usuario ANTES de iniciar el generador: dentro del
+    # stream ya no hay contexto de request/session disponible.
+    usuario_id = session['usuario_id']
+    return Response(generate_frames(usuario_id),
                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/perfil')
+@sesion_invitado
 def perfil():
     # Solo una página simple para que no de error
     return "<h1>Perfil de Usuario</h1><p>Usuario: " + session.get('usuario', 'Invitado') + "</p><a href='/home'>Volver</a>"
 
+# ------------------------------------------------------------
+# 6. SUBIDA DE IMÁGENES (flujo principal de la demo del portafolio)
+# El visitante sube una foto, YOLO localiza las placas, PaddleOCR
+# lee el texto y todo queda guardado en SU sesión.
+# ------------------------------------------------------------
+EXTENSIONES_PERMITIDAS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp'}
+MAX_TAMANO_MB = 10
+
+def procesar_imagen_subida(img, usuario_id):
+    """Detecta y lee todas las placas de una imagen. Devuelve
+    (lista de resultados, imagen anotada en base64)."""
+    resultados = []
+    anotada = img.copy()
+
+    detecciones_yolo = model(img, conf=0.4, verbose=False)
+    boxes = detecciones_yolo[0].boxes
+    if boxes is None or len(boxes) == 0:
+        return [], None
+
+    now = datetime.datetime.now()
+    capturas_dir = os.path.join(BASE_DIR, "static", "capturas")
+    os.makedirs(capturas_dir, exist_ok=True)
+
+    conn = get_db_connection()
+    try:
+        for i, box in enumerate(boxes.xyxy.int().cpu().tolist()):
+            x1, y1, x2, y2 = box
+            conf = float(boxes.conf[i])
+
+            alto, ancho = img.shape[:2]
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(ancho, x2), min(alto, y2)
+            if x1 >= x2 or y1 >= y2:
+                continue
+
+            recorte = img[y1:y2, x1:x2]
+            if recorte.size == 0:
+                continue
+
+            # OCR sobre el recorte de la placa
+            plate_text = "DESCONOCIDO"
+            try:
+                ocr_result = ocr.ocr(recorte, det=False, cls=True)
+                if ocr_result and ocr_result[0] and len(ocr_result[0]) > 0:
+                    raw_text = ocr_result[0][0][0]
+                    if raw_text:
+                        plate_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper()) or "DESCONOCIDO"
+            except Exception as e:
+                print(f"Error en OCR de imagen subida: {e}")
+
+            # Dibujar el resultado sobre la imagen anotada
+            cv2.rectangle(anotada, (x1, y1), (x2, y2), (0, 255, 0), 3)
+            cv2.putText(anotada, plate_text, (x1, max(30, y1 - 12)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
+
+            # Guardar el recorte para el historial
+            safe_plate = re.sub(r'[^\w]', '_', plate_text)[:20]
+            filename = f"{safe_plate}_{now.strftime('%Y%m%d_%H%M%S')}_UP{i}_CONF{conf:.2f}.jpg"
+            cv2.imwrite(os.path.join(capturas_dir, filename), recorte)
+
+            # Registrar la detección en la sesión del visitante. En modo demo
+            # `usuario_id` es None: no hay fila de usuario a la que enlazarla,
+            # así que se salta el guardado y se devuelve igual el resultado.
+            if conn and usuario_id is not None:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO detecciones (usuario_id, placa, fecha, hora, imagen, confianza, track_id, tiempo_observacion) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    (usuario_id, plate_text, now.strftime('%Y-%m-%d'),
+                     now.strftime('%H:%M:%S'), filename, conf, None, None)
+                )
+                conn.commit()
+                cursor.close()
+
+            resultados.append({
+                'placa': plate_text,
+                'confianza': round(conf * 100, 1),
+                'imagen': filename
+            })
+    finally:
+        if conn:
+            conn.close()
+
+    if not resultados:
+        return [], None
+
+    # Imagen anotada como base64 para mostrarla al instante
+    ret, buffer_img = cv2.imencode('.jpg', anotada)
+    imagen_b64 = base64.b64encode(buffer_img).decode('utf-8') if ret else None
+    return resultados, imagen_b64
+
+@app.route('/subir', methods=['GET', 'POST'])
+@sesion_invitado
+def subir():
+    resultados = []
+    error = None
+    imagen_anotada = None
+
+    if request.method == 'POST':
+        archivo = request.files.get('imagen')
+        if not archivo or archivo.filename == '':
+            error = "Selecciona una imagen primero."
+        elif os.path.splitext(archivo.filename)[1].lower() not in EXTENSIONES_PERMITIDAS:
+            error = "Formato no soportado. Usa JPG, PNG, WEBP o BMP."
+        elif not model:
+            error = "El modelo de detección no está disponible."
+        else:
+            data = archivo.read()
+            if len(data) > MAX_TAMANO_MB * 1024 * 1024:
+                error = f"La imagen supera el máximo de {MAX_TAMANO_MB} MB."
+            else:
+                img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+                if img is None:
+                    error = "El archivo no es una imagen válida."
+                else:
+                    resultados, imagen_anotada = procesar_imagen_subida(img, session['usuario_id'])
+                    if not resultados:
+                        error = "No se detectó ninguna placa en la imagen. Prueba con una foto donde la placa se vea de frente."
+
+    return render_template('subir.html', resultados=resultados,
+                           error=error, imagen_anotada=imagen_anotada)
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000, use_reloader=False)
+    # En local se comporta igual que antes: basta con exportar FLASK_DEBUG=1.
+    #
+    # El valor por defecto es 0 a propósito. Con debug activo, el depurador de
+    # Werkzeug deja ejecutar código arbitrario desde el navegador, y esto va a
+    # quedar expuesto en internet.
+    #
+    # El host y el puerto se leen del entorno porque dentro de un contenedor
+    # hay que escuchar en todas las interfaces, y la plataforma decide el
+    # puerto (Hugging Face Spaces usa el 7860).
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    puerto = int(os.environ.get("PORT", 5000))
+    host = os.environ.get("HOST", "127.0.0.1" if debug else "0.0.0.0")
+    app.run(debug=debug, host=host, port=puerto, use_reloader=False)

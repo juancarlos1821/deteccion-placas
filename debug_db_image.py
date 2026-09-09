@@ -1,14 +1,21 @@
 
-import mysql.connector
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
-    connection = mysql.connector.connect(
-        host='127.0.0.1',
-        user='root',
-        password='',
-        database='control_vehicular'
+    connection = psycopg2.connect(
+        host=os.environ.get('SUPABASE_DB_HOST'),
+        port=os.environ.get('SUPABASE_DB_PORT', '6543'),
+        user=os.environ.get('SUPABASE_DB_USER'),
+        password=os.environ.get('SUPABASE_DB_PASSWORD'),
+        dbname=os.environ.get('SUPABASE_DB_NAME', 'postgres'),
+        sslmode='require'
     )
-    cursor = connection.cursor(dictionary=True)
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
     cursor.execute("SELECT id, imagen FROM detecciones ORDER BY id DESC LIMIT 1")
     row = cursor.fetchone()
     

@@ -4,18 +4,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Control UNPRG{% endblock %}</title>
+    <title>{% block title %}PlacaScan · Demo de Visión Artificial{% endblock %}</title>
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        // Paleta "asfalto de noche": ámbar de señalización vial como acento,
+        // verde reservado para detecciones de la IA (como los bounding boxes).
+        // Se remapean los nombres que ya usan las plantillas (indigo/slate/etc.)
+        // para que todas las páginas hereden la identidad sin reescribirlas.
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        sans: ['Archivo', 'system-ui', 'sans-serif'],
+                        display: ['"Saira Condensed"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
                     },
+                    colors: {
+                        indigo: {
+                            50: '#FFF9E6', 100: '#FFF3CC', 200: '#FFE699', 300: '#FFD966',
+                            400: '#F5B301', 500: '#E0A400', 600: '#C28E00', 700: '#8F6900',
+                            800: '#5C4400', 900: '#3D2D00'
+                        },
+                        violet: {
+                            50: '#FFF9E6', 100: '#FFF3CC', 200: '#FFE699', 300: '#FFD966',
+                            400: '#F5B301', 500: '#E0A400', 600: '#C28E00', 700: '#8F6900',
+                            800: '#5C4400', 900: '#3D2D00'
+                        },
+                        emerald: {
+                            50: '#EAFBF1', 100: '#D2F5E1', 200: '#A5EBC4', 300: '#74DFA3',
+                            400: '#38D97C', 500: '#22C06A', 600: '#189A54', 700: '#127441',
+                            800: '#0C4E2C', 900: '#072F1B'
+                        },
+                        slate: {
+                            50: '#F4F5F4', 100: '#E6E8E6', 200: '#CDD1CE', 300: '#B9BEBA',
+                            400: '#8F968F', 500: '#6C736C', 600: '#4C524C', 700: '#343934',
+                            800: '#212521', 900: '#151815'
+                        }
+                    }
                 }
             }
         }
@@ -24,76 +52,189 @@
     <!-- Google Fonts & Font Awesome -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Saira+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
+        :root {
+            --asfalto-0: #101312;
+            --asfalto-1: #171b19;
+            --asfalto-2: #1e2320;
+            --ambar: #F5B301;
+            --deteccion: #38D97C;
+            --placa-blanco: #F4F6F0;
+            --placa-tinta: #171B1C;
+            --placa-azul: #1B4FA0;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Archivo', sans-serif;
         }
 
-        .theme-btn {
-            width: 36px;
-            height: 36px;
+        /* ===== FONDO: asfalto de noche ===== */
+        .main-bg {
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245, 179, 1, 0.05), transparent),
+                linear-gradient(165deg, var(--asfalto-2) 0%, var(--asfalto-0) 60%, #121510 100%);
         }
 
-        /* ===== GLASSMORPHISM SIDEBAR ===== */
+        /* ===== SIDEBAR ===== */
         .glass-sidebar {
-            background: rgba(15, 12, 41, 0.85);
+            background: rgba(16, 19, 18, 0.92);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            border-right: 1px solid rgba(245, 179, 1, 0.08);
         }
 
         .sidebar-link {
-            transition: all 0.2s ease;
+            transition: all 0.18s ease;
+            border-left: 3px solid transparent;
         }
 
         .sidebar-link:hover {
-            background: rgba(99, 102, 241, 0.1);
+            background: rgba(245, 179, 1, 0.07);
+            transform: translateX(2px);
         }
 
         .sidebar-link.active {
-            background: rgba(99, 102, 241, 0.15);
-            border-left: 3px solid #818cf8;
+            background: rgba(245, 179, 1, 0.1);
+            border-left: 3px solid var(--ambar);
         }
 
-        /* ===== GLASS HEADER ===== */
+        /* ===== HEADER ===== */
         .glass-header {
-            background: rgba(15, 12, 41, 0.6);
+            background: rgba(16, 19, 18, 0.7);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        /* ===== ANIMATED BG FOR MAIN AREA ===== */
-        .main-bg {
-            background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%);
-        }
-
-        /* ===== GLASS CARDS ===== */
+        /* ===== TARJETAS ===== */
         .glass-card {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.035);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+            transition: all 0.25s ease;
         }
 
         .glass-card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.1);
+            border-color: rgba(245, 179, 1, 0.25);
+            box-shadow: 0 8px 32px rgba(245, 179, 1, 0.07);
             transform: translateY(-2px);
         }
 
-        /* ===== USER DROPDOWN GLASS ===== */
         .glass-dropdown {
-            background: rgba(30, 27, 60, 0.95);
+            background: rgba(23, 27, 25, 0.97);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+        }
+
+        /* ===== ELEMENTO FIRMA: la placa vehicular ===== */
+        .plate {
+            display: inline-flex;
+            align-items: stretch;
+            background: linear-gradient(180deg, #FDFEFA 0%, #E9EDE4 100%);
+            border: 2px solid var(--placa-tinta);
+            border-radius: 7px;
+            overflow: hidden;
+            box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .plate-band {
+            background: linear-gradient(180deg, #2560B8, var(--placa-azul));
+            color: #fff;
+            font-family: 'Archivo', sans-serif;
+            font-weight: 800;
+            font-size: 0.5em;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            padding: 0 0.45em;
+        }
+
+        .plate-num {
+            font-family: 'Saira Condensed', sans-serif;
+            font-weight: 700;
+            color: var(--placa-tinta);
+            letter-spacing: 0.14em;
+            padding: 0.1em 0.55em 0.12em 0.6em;
+            line-height: 1.25;
+            white-space: nowrap;
+        }
+
+        /* Animación de "sello" cuando aparece una placa nueva */
+        @keyframes plate-stamp {
+            0% { transform: scale(1.35); opacity: 0; }
+            60% { transform: scale(0.96); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+
+        .plate-stamp {
+            animation: plate-stamp 0.45s cubic-bezier(.2, .9, .3, 1.2) both;
+        }
+
+        /* ===== VISOR DE CÁMARA (esquinas de encuadre) ===== */
+        .viewfinder {
+            position: relative;
+        }
+
+        .vf-corner {
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            border: 2.5px solid rgba(245, 179, 1, 0.55);
+            transition: all 0.25s ease;
+            pointer-events: none;
+        }
+
+        .vf-corner.tl { top: 12px; left: 12px; border-right: none; border-bottom: none; border-top-left-radius: 4px; }
+        .vf-corner.tr { top: 12px; right: 12px; border-left: none; border-bottom: none; border-top-right-radius: 4px; }
+        .vf-corner.bl { bottom: 12px; left: 12px; border-right: none; border-top: none; border-bottom-left-radius: 4px; }
+        .vf-corner.br { bottom: 12px; right: 12px; border-left: none; border-top: none; border-bottom-right-radius: 4px; }
+
+        .viewfinder.vf-activo .vf-corner {
+            border-color: var(--ambar);
+            width: 34px;
+            height: 34px;
+        }
+
+        /* Línea de escaneo mientras la IA analiza */
+        @keyframes scan-sweep {
+            0% { top: 4%; opacity: 0; }
+            8% { opacity: 1; }
+            92% { opacity: 1; }
+            100% { top: 94%; opacity: 0; }
+        }
+
+        .scan-beam {
+            display: none;
+            position: absolute;
+            left: 6%;
+            right: 6%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--ambar) 25%, #fff 50%, var(--ambar) 75%, transparent);
+            box-shadow: 0 0 14px rgba(245, 179, 1, 0.8);
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        .escaneando .scan-beam {
+            display: block;
+            animation: scan-sweep 1.6s ease-in-out infinite;
+        }
+
+        /* ===== UTILIDADES ===== */
+        .theme-btn { width: 36px; height: 36px; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .scan-beam, .animate-ping, .plate-stamp { animation: none !important; }
+            .glass-card:hover, .sidebar-link:hover { transform: none; }
         }
     </style>
 </head>
@@ -102,18 +243,27 @@
 
     <div class="flex h-screen overflow-hidden main-bg text-gray-100">
 
-        <!-- ===== GLASSMORPHISM SIDEBAR ===== -->
-        <aside id="sidebar" class="glass-sidebar w-64 hidden md:flex flex-col transition-all duration-300 z-30">
+        <!-- Fondo para cerrar el menú en móvil -->
+        <div id="sidebarBackdrop" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden"></div>
 
-            <!-- Logo -->
-            <div class="h-16 flex items-center justify-between px-6 border-b border-white/[0.06]">
-                <div class="flex items-center gap-3 font-bold text-lg">
-                    <div class="bg-indigo-500/20 text-indigo-400 p-2 rounded-xl border border-indigo-400/20">
-                        <i class="fa-solid fa-shield-halved text-sm"></i>
-                    </div>
-                    <span class="sidebar-text text-white tracking-tight">Control UNPRG</span>
-                </div>
-                <button id="collapseSidebarBtn" class="text-slate-500 hover:text-indigo-400 transition-colors">
+        <!-- ===== SIDEBAR ===== -->
+        <aside id="sidebar"
+            class="glass-sidebar w-64 hidden md:flex flex-col transition-all duration-300 z-40 max-md:fixed max-md:inset-y-0 max-md:left-0">
+
+            <!-- Logo: mini placa -->
+            <div class="h-16 flex items-center justify-between px-5 border-b border-white/[0.06]">
+                <a href="{{ url_for('home') }}" class="flex items-center gap-3">
+                    <span class="plate text-lg" aria-hidden="true">
+                        <span class="plate-band">PE</span>
+                        <span class="plate-num">SCAN</span>
+                    </span>
+                    <span class="sidebar-text">
+                        <span class="block font-display font-bold text-white text-lg uppercase tracking-wide leading-none">PlacaScan</span>
+                        <span class="block text-[10px] text-slate-500 font-mono mt-0.5">YOLOV8 + OCR</span>
+                    </span>
+                </a>
+                <button id="collapseSidebarBtn" class="hidden md:block text-slate-500 hover:text-indigo-400 transition-colors"
+                    aria-label="Contraer menú">
                     <i id="collapseIcon" class="fa-solid fa-chevron-left text-xs"></i>
                 </button>
             </div>
@@ -121,32 +271,37 @@
             <!-- Navigation -->
             <nav class="flex-1 overflow-y-auto py-6 px-3 space-y-1">
                 <p class="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-3 sidebar-text">
-                    Operaciones</p>
+                    La demo</p>
+
+                <a href="{{ url_for('subir') }}"
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-r-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'subir' else 'text-slate-400 hover:text-white' }}">
+                    <i class="fa-solid fa-cloud-arrow-up w-5 text-center"></i>
+                    <span class="sidebar-text">Subir imagen</span>
+                </a>
 
                 <a href="{{ url_for('home') }}"
-                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'home' else 'text-slate-400 hover:text-white' }}">
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-r-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'home' else 'text-slate-400 hover:text-white' }}">
                     <i class="fa-solid fa-chart-line w-5 text-center"></i>
                     <span class="sidebar-text">Dashboard</span>
                 </a>
 
                 <a href="{{ url_for('camaras') }}"
-                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'camaras' else 'text-slate-400 hover:text-white' }}">
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-r-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'camaras' else 'text-slate-400 hover:text-white' }}">
                     <i class="fa-solid fa-video w-5 text-center"></i>
-                    <span class="sidebar-text">Cámaras en Vivo</span>
+                    <span class="sidebar-text">Cámara en vivo</span>
                 </a>
+
+                <p class="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-widest mt-8 mb-3 sidebar-text">
+                    Tus lecturas</p>
 
                 <a href="{{ url_for('historial') }}"
-                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'historial' else 'text-slate-400 hover:text-white' }}">
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-r-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'historial' else 'text-slate-400 hover:text-white' }}">
                     <i class="fa-solid fa-clock-rotate-left w-5 text-center"></i>
-                    <span class="sidebar-text">Historial Accesos</span>
+                    <span class="sidebar-text">Historial</span>
                 </a>
 
-                <p
-                    class="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-widest mt-8 mb-3 sidebar-text">
-                    Descargas</p>
-
                 <a href="{{ url_for('reportes') }}"
-                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'reportes' else 'text-slate-400 hover:text-white' }}">
+                    class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-r-xl text-sm {{ 'active text-indigo-400 font-medium' if request.endpoint == 'reportes' else 'text-slate-400 hover:text-white' }}">
                     <i class="fa-solid fa-file-arrow-down w-5 text-center"></i>
                     <span class="sidebar-text">Reportes</span>
                 </a>
@@ -156,11 +311,11 @@
             <div class="p-4 flex items-center gap-3 border-t border-white/[0.06]">
                 <div
                     class="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-400 border border-indigo-400/20">
-                    {{ session.get('usuario', 'U')[0]|upper }}
+                    {{ session.get('usuario', 'I')[0]|upper }}
                 </div>
                 <div class="sidebar-text">
-                    <p class="text-sm font-medium text-white">{{ session.get('usuario', 'Usuario') }}</p>
-                    <p class="text-[11px] text-slate-500">Admin UNPRG</p>
+                    <p class="text-sm font-medium text-white">{{ session.get('usuario', 'Invitado') }}</p>
+                    <p class="text-[11px] text-slate-500">Sesión de prueba privada</p>
                 </div>
             </div>
         </aside>
@@ -168,42 +323,36 @@
         <!-- ===== MAIN CONTENT ===== -->
         <div class="flex-1 flex flex-col overflow-hidden">
 
-            <!-- Glass Header -->
+            <!-- Header -->
             <header class="glass-header h-16 flex items-center justify-between px-6 z-10">
-                <button id="mobileMenuBtn" class="md:hidden text-slate-400 hover:text-white">
+                <button id="mobileMenuBtn" class="md:hidden text-slate-400 hover:text-white" aria-label="Abrir menú">
                     <i class="fa-solid fa-bars text-xl"></i>
                 </button>
 
                 <div class="flex items-center gap-4 ml-auto">
-                    <!-- Theme Toggle -->
-                    <div class="flex bg-white/5 rounded-xl p-1 border border-white/[0.06]">
-                        <button id="lightBtn"
-                            class="theme-btn rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
-                            <i class="fa-solid fa-sun text-sm text-amber-400"></i>
-                        </button>
-                        <button id="darkBtn"
-                            class="theme-btn rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
-                            <i class="fa-solid fa-moon text-sm text-indigo-400"></i>
-                        </button>
-                    </div>
+                    <!-- Enlace al código (para reclutadores) -->
+                    <a href="https://github.com/juancarlos1821/deteccion-placas" target="_blank" rel="noopener"
+                        class="hidden sm:inline-flex items-center gap-2 text-sm text-slate-400 hover:text-indigo-400 border border-white/[0.08] hover:border-indigo-400/40 px-3.5 py-2 rounded-xl transition-all">
+                        <i class="fa-brands fa-github"></i>
+                        <span class="font-medium">Ver código</span>
+                    </a>
 
                     <!-- User Dropdown -->
                     <div class="relative">
                         <button id="userMenuBtn"
                             class="flex items-center gap-2 text-slate-300 hover:text-white transition-colors">
-                            <span class="text-sm font-medium">{{ session.get('usuario', 'Usuario') }}</span>
+                            <span class="text-sm font-medium">{{ session.get('usuario', 'Invitado') }}</span>
                             <i class="fa-solid fa-chevron-down text-[10px]"></i>
                         </button>
                         <div id="userDropdown"
-                            class="glass-dropdown absolute right-0 mt-3 w-48 rounded-xl shadow-2xl hidden z-50 overflow-hidden">
-                            <a href="{{ url_for('perfil') }}"
-                                class="flex items-center gap-2.5 px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
-                                <i class="fa-solid fa-user text-xs text-slate-500"></i> Mi Perfil
-                            </a>
-                            <div class="border-t border-white/[0.06]"></div>
+                            class="glass-dropdown absolute right-0 mt-3 w-52 rounded-xl shadow-2xl hidden z-50 overflow-hidden">
+                            <div class="px-4 py-3 border-b border-white/[0.06]">
+                                <p class="text-xs text-slate-500">Tus datos son privados y se</p>
+                                <p class="text-xs text-slate-500">borran automáticamente en 24 h.</p>
+                            </div>
                             <a href="{{ url_for('logout') }}"
-                                class="flex items-center gap-2.5 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors">
-                                <i class="fa-solid fa-right-from-bracket text-xs"></i> Cerrar Sesión
+                                class="flex items-center gap-2.5 px-4 py-3 text-sm text-indigo-400 hover:bg-indigo-500/10 transition-colors">
+                                <i class="fa-solid fa-rotate-right text-xs"></i> Reiniciar demo
                             </a>
                         </div>
                     </div>
@@ -221,33 +370,23 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const html = document.documentElement;
 
-            function setTheme(theme) {
-                html.classList.toggle('dark', theme === 'dark');
-                localStorage.setItem('theme', theme);
-            }
-            setTheme(localStorage.getItem('theme') || 'dark');
-
-            document.getElementById('lightBtn').onclick = () => setTheme('light');
-            document.getElementById('darkBtn').onclick = () => setTheme('dark');
-
+            // --- Menú de usuario ---
             const userBtn = document.getElementById('userMenuBtn');
             const userDropdown = document.getElementById('userDropdown');
-
             if (userBtn) {
                 userBtn.onclick = (e) => {
                     e.stopPropagation();
                     userDropdown.classList.toggle('hidden');
                 };
-                document.onclick = () => userDropdown.classList.add('hidden');
+                document.addEventListener('click', () => userDropdown.classList.add('hidden'));
             }
 
+            // --- Contraer sidebar (escritorio) ---
             const sidebar = document.getElementById('sidebar');
             const collapseBtn = document.getElementById('collapseSidebarBtn');
             const collapseIcon = document.getElementById('collapseIcon');
             const texts = document.querySelectorAll('.sidebar-text');
-
             if (collapseBtn) {
                 collapseBtn.onclick = () => {
                     sidebar.classList.toggle('w-64');
@@ -256,6 +395,24 @@
                     collapseIcon.classList.toggle('fa-chevron-left');
                     collapseIcon.classList.toggle('fa-chevron-right');
                 };
+            }
+
+            // --- Menú móvil ---
+            const mobileBtn = document.getElementById('mobileMenuBtn');
+            const backdrop = document.getElementById('sidebarBackdrop');
+            function cerrarMenuMovil() {
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('flex');
+                backdrop.classList.add('hidden');
+            }
+            if (mobileBtn) {
+                mobileBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    sidebar.classList.toggle('hidden');
+                    sidebar.classList.toggle('flex');
+                    backdrop.classList.toggle('hidden');
+                };
+                backdrop.onclick = cerrarMenuMovil;
             }
         });
     </script>

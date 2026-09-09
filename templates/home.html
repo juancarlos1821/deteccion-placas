@@ -1,72 +1,104 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard - Control Vehicular UNPRG{% endblock %}
+{% block title %}Dashboard · PlacaScan{% endblock %}
 
 {% block content %}
-<!-- Page Title -->
-<div class="mb-8">
-    <h1 class="text-2xl font-bold text-white tracking-tight">Resumen de Actividad</h1>
-    <p class="text-slate-500 text-sm mt-1">Panel de control del Sistema de Monitoreo Vehicular</p>
+
+<!-- ===== HERO: la tesis de la demo ===== -->
+<div class="glass-card rounded-2xl px-8 py-10 mb-6 relative overflow-hidden">
+    <!-- línea de carril decorativa -->
+    <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 via-indigo-400/40 to-transparent"></div>
+
+    <div class="flex flex-col lg:flex-row lg:items-center gap-10">
+        <div class="flex-1">
+            <p class="font-mono text-[11px] text-indigo-400 tracking-[0.25em] uppercase mb-3">
+                Demo en vivo · Visión artificial
+            </p>
+            <h1 class="font-display font-bold uppercase text-white leading-[0.95] tracking-wide text-4xl sm:text-5xl">
+                La cámara ve.<br>
+                <span class="text-indigo-400">La IA lee la placa.</span>
+            </h1>
+            <p class="text-slate-400 text-sm mt-4 max-w-md leading-relaxed">
+                Sube la foto de un vehículo: YOLOv8 localiza la placa y un OCR entrenado a medida
+                lee sus caracteres en segundos. Todo lo que subas es privado de tu sesión.
+            </p>
+            <a href="{{ url_for('subir') }}"
+                class="mt-6 inline-flex items-center gap-2.5 bg-indigo-400 hover:bg-indigo-300 text-slate-900 font-bold px-6 py-3.5 rounded-xl text-sm transition-all hover:scale-[1.03] active:scale-[0.98]">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                Probar con una foto
+            </a>
+        </div>
+
+        <!-- Última lectura como placa física -->
+        <div class="flex flex-col items-center gap-3 lg:pr-6">
+            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Tu última lectura</p>
+            <div id="plateWrap" class="plate text-5xl sm:text-6xl {{ 'opacity-40' if not ultima else '' }}">
+                <span class="plate-band">PE</span>
+                <span class="plate-num" id="detTexto">{{ ultima.placa if ultima else '· · · · · ·' }}</span>
+            </div>
+            <p class="font-mono text-xs text-slate-500" id="detHora">
+                {{ ultima.hora if ultima else 'Tu primera placa aparecerá aquí' }}
+            </p>
+        </div>
+    </div>
 </div>
 
-<!-- ===== SUMMARY CARDS ===== -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+<!-- ===== INDICADORES DE SESIÓN ===== -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
 
-    <!-- Card: Total Registros Hoy -->
+    <!-- Lecturas en tu sesión -->
     <div class="glass-card rounded-2xl p-6 group">
         <div class="flex items-center justify-between mb-4">
             <div
                 class="w-11 h-11 rounded-xl bg-indigo-500/15 flex items-center justify-center border border-indigo-400/20 group-hover:bg-indigo-500/25 transition-colors">
                 <i class="fa-solid fa-database text-indigo-400"></i>
             </div>
-            <span
-                class="text-[10px] font-semibold uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg">
-                <i class="fa-solid fa-arrow-up text-[8px] mr-1"></i>Hoy
-            </span>
+            <span class="font-mono text-[10px] text-slate-500 uppercase tracking-widest">Privado</span>
         </div>
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Registros</p>
-        <h3 class="text-3xl font-extrabold text-white mt-1 tracking-tight" id="totalRegistros">{{ total }}</h3>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Placas leídas en tu sesión</p>
+        <h3 class="text-3xl font-extrabold text-white mt-1 tracking-tight font-mono" id="totalRegistros"
+            data-valor="{{ total }}">0</h3>
     </div>
 
-    <!-- Card: Vehículos en Tiempo Real -->
+    <!-- Motor IA -->
     <div class="glass-card rounded-2xl p-6 group">
         <div class="flex items-center justify-between mb-4">
             <div
                 class="w-11 h-11 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-400/20 group-hover:bg-emerald-500/25 transition-colors">
-                <i class="fa-solid fa-car text-emerald-400"></i>
+                <i class="fa-solid fa-microchip text-emerald-400"></i>
             </div>
-            <span class="relative flex h-3 w-3">
-                <span
-                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative flex h-3 w-3" aria-hidden="true">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
             </span>
         </div>
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vehículos en Tiempo Real</p>
-        <h3 class="text-3xl font-extrabold text-emerald-400 mt-1 tracking-tight">Activo</h3>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Motor de detección</p>
+        <h3 class="text-xl font-extrabold text-emerald-400 mt-2 tracking-tight">En línea</h3>
+        <p class="font-mono text-[10px] text-slate-500 mt-1">YOLOv8s · PaddleOCR custom</p>
     </div>
 
-    <!-- Card: Última Detección -->
-    <div class="glass-card rounded-2xl p-6 group">
+    <!-- Cámara en vivo -->
+    <a href="{{ url_for('camaras') }}" class="glass-card rounded-2xl p-6 group block">
         <div class="flex items-center justify-between mb-4">
             <div
-                class="w-11 h-11 rounded-xl bg-violet-500/15 flex items-center justify-center border border-violet-400/20 group-hover:bg-violet-500/25 transition-colors">
-                <i class="fa-solid fa-crosshairs text-violet-400"></i>
+                class="w-11 h-11 rounded-xl bg-indigo-500/15 flex items-center justify-center border border-indigo-400/20 group-hover:bg-indigo-500/25 transition-colors">
+                <i class="fa-solid fa-video text-indigo-400"></i>
             </div>
-            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider" id="detHora">{{ ultima.hora
-                if ultima else '--:--' }}</span>
+            <i class="fa-solid fa-arrow-right text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all"></i>
         </div>
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Última Detección</p>
-        <h3 class="text-xl font-mono font-extrabold text-violet-400 mt-2 tracking-[0.2em]" id="detTexto">{{ ultima.placa
-            if ultima else 'SIN REGISTROS' }}</h3>
-    </div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Modo continuo</p>
+        <h3 class="text-xl font-extrabold text-white mt-2 tracking-tight">Ver cámara en vivo</h3>
+        <p class="text-[11px] text-slate-500 mt-1">Detección sobre video de tráfico real</p>
+    </a>
 </div>
 
-<!-- ===== CHART: Flujo de Vehículos por Hora ===== -->
+<!-- ===== GRÁFICO: Lecturas por hora ===== -->
 <div class="glass-card rounded-2xl p-6">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h4 class="font-bold text-white text-base" id="chartTitle">Flujo de Vehículos por Hora</h4>
-            <p class="text-slate-500 text-xs mt-0.5">Distribución de detecciones en las últimas 24 horas</p>
+            <h4 class="font-display font-semibold uppercase tracking-wide text-white text-lg" id="chartTitle">
+                Tus lecturas de hoy</h4>
+            <p class="text-slate-500 text-xs mt-0.5">Distribución por hora · solo tu sesión</p>
         </div>
         <div class="w-9 h-9 rounded-xl bg-indigo-500/15 flex items-center justify-center border border-indigo-400/20">
             <i class="fa-solid fa-chart-bar text-indigo-400 text-sm"></i>
@@ -81,24 +113,40 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        // --- Contador animado de lecturas ---
+        const totalEl = document.getElementById('totalRegistros');
+        const objetivo = parseInt(totalEl.dataset.valor, 10) || 0;
+        if (reduceMotion || objetivo === 0) {
+            totalEl.textContent = objetivo;
+        } else {
+            const duracion = 700;
+            const inicio = performance.now();
+            (function tick(ahora) {
+                const p = Math.min((ahora - inicio) / duracion, 1);
+                totalEl.textContent = Math.round(objetivo * (1 - Math.pow(1 - p, 3)));
+                if (p < 1) requestAnimationFrame(tick);
+            })(inicio);
+        }
+
+        // --- Gráfico de lecturas por hora ---
         const ctx = document.getElementById('flujoChart').getContext('2d');
-
-        // Gradient fill
         const gradient = ctx.createLinearGradient(0, 0, 0, 280);
-        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)');
-        gradient.addColorStop(1, 'rgba(99, 102, 241, 0.02)');
+        gradient.addColorStop(0, 'rgba(245, 179, 1, 0.55)');
+        gradient.addColorStop(1, 'rgba(245, 179, 1, 0.03)');
 
-        const chartConfig = {
+        const flujoChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: [],
                 datasets: [{
-                    label: 'Vehículos detectados',
+                    label: 'Placas leídas',
                     data: [],
                     backgroundColor: gradient,
-                    borderColor: 'rgba(129, 140, 248, 0.8)',
+                    borderColor: 'rgba(245, 179, 1, 0.85)',
                     borderWidth: 1.5,
-                    borderRadius: 8,
+                    borderRadius: 6,
                     borderSkipped: false,
                     barPercentage: 0.6,
                     categoryPercentage: 0.7,
@@ -111,76 +159,74 @@
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 12, 41, 0.9)',
-                        titleColor: '#c7d2fe',
-                        bodyColor: '#e2e8f0',
-                        borderColor: 'rgba(129, 140, 248, 0.3)',
+                        backgroundColor: 'rgba(16, 19, 18, 0.95)',
+                        titleColor: '#FFD966',
+                        bodyColor: '#e5e7e5',
+                        borderColor: 'rgba(245, 179, 1, 0.35)',
                         borderWidth: 1,
                         padding: 12,
-                        cornerRadius: 12,
+                        cornerRadius: 10,
                         displayColors: false,
                         titleFont: { weight: '600', size: 13 },
                         bodyFont: { size: 12 },
                         callbacks: {
-                            title: (items) => `🕐 ${items[0].label}`,
-                            label: (item) => `${item.raw} vehículos detectados`
+                            title: (items) => items[0].label + ' h',
+                            label: (item) => item.raw + (item.raw === 1 ? ' placa leída' : ' placas leídas')
                         }
                     }
                 },
                 scales: {
                     x: {
                         grid: { display: false },
-                        ticks: { color: 'rgba(148,163,184,0.5)', font: { size: 11, weight: '500' } },
+                        ticks: { color: 'rgba(143,150,143,0.6)', font: { size: 11, weight: '500' } },
                         border: { display: false }
                     },
                     y: {
                         grid: { color: 'rgba(255,255,255,0.04)' },
-                        ticks: { color: 'rgba(148,163,184,0.5)', font: { size: 11 }, stepSize: 5 },
+                        ticks: { color: 'rgba(143,150,143,0.6)', font: { size: 11 }, stepSize: 5 },
                         border: { display: false },
                         beginAtZero: true
                     }
                 }
             }
-        };
+        });
 
-        const flujoChart = new Chart(ctx, chartConfig);
-
-        // Fetch real data from API
         function loadChartData() {
             fetch('/api/flujo-vehicular')
                 .then(r => r.json())
                 .then(data => {
                     flujoChart.data.labels = data.labels;
                     flujoChart.data.datasets[0].data = data.data;
-
-                    // Calculate total and update title
-                    const totalAutos = data.data.reduce((a, b) => a + b, 0);
-                    document.getElementById('chartTitle').textContent = `Tráfico de hoy: ${totalAutos} autos`;
-
-                    // Dynamic Y-axis max (20% padding)
+                    const totalHoy = data.data.reduce((a, b) => a + b, 0);
+                    document.getElementById('chartTitle').textContent =
+                        totalHoy > 0 ? `Tus lecturas de hoy: ${totalHoy}` : 'Tus lecturas de hoy';
                     const maxVal = Math.max(...data.data);
                     flujoChart.options.scales.y.suggestedMax = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 10;
-
                     flujoChart.update();
                 })
                 .catch(() => { });
         }
         loadChartData();
-        // Refresh chart every 30 seconds
         setInterval(loadChartData, 30000);
 
-        // --- Live data from /get_latest_detection ---
+        // --- Última detección en vivo (placa del hero) ---
+        const plateWrap = document.getElementById('plateWrap');
+        const detTexto = document.getElementById('detTexto');
+        const detHora = document.getElementById('detHora');
+        let placaAnterior = detTexto.textContent.trim();
+
         function updateDetection() {
             fetch('/get_latest_detection')
                 .then(r => r.json())
                 .then(data => {
-                    if (data.texto) {
-                        document.getElementById('detTexto').textContent = data.texto;
+                    if (data.texto && data.texto !== 'ESPERANDO...' && data.texto !== placaAnterior) {
+                        placaAnterior = data.texto;
+                        detTexto.textContent = data.texto;
+                        if (data.hora) detHora.textContent = data.hora;
+                        plateWrap.classList.remove('opacity-40', 'plate-stamp');
+                        void plateWrap.offsetWidth; // reinicia la animación
+                        plateWrap.classList.add('plate-stamp');
                     }
-                    if (data.hora) {
-                        document.getElementById('detHora').textContent = data.hora;
-                    }
-                    // totalRegistros se carga desde el servidor (no del contador en memoria)
                 })
                 .catch(() => { });
         }

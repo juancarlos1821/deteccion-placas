@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block title %}Subir imagen · PlacaScan{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <p class="font-mono text-[11px] text-indigo-400 tracking-[0.25em] uppercase mb-2">
+            YOLOv8 localiza · PaddleOCR lee
+        </p>
+        <h1 class="font-display font-bold uppercase tracking-wide text-white text-4xl leading-none">
+            Sube. Detecta. Lee.
+        </h1>
+        <p class="text-slate-400 text-sm mt-3 max-w-lg">
+            Elige una foto donde se vea la placa del vehículo. La IA la encontrará,
+            leerá sus caracteres y la guardará en tu historial privado.
+        </p>
+    </div>
+
+    <!-- Formulario: visor de cámara -->
+    <div class="glass-card rounded-2xl p-6 mb-8">
+        <form action="{{ url_for('subir') }}" method="post" enctype="multipart/form-data" id="uploadForm">
+
+            <label for="imagen" id="dropzone"
+                class="viewfinder flex flex-col items-center justify-center gap-4 bg-black/30 rounded-2xl py-14 px-6 cursor-pointer transition-all text-center border border-white/[0.05] hover:border-indigo-400/30">
+                <!-- Esquinas de encuadre -->
+                <span class="vf-corner tl"></span>
+                <span class="vf-corner tr"></span>
+                <span class="vf-corner bl"></span>
+                <span class="vf-corner br"></span>
+                <!-- Línea de escaneo (visible al analizar) -->
+                <span class="scan-beam"></span>
+
+                <i class="fa-solid fa-camera-retro text-4xl text-indigo-400/70 pointer-events-none" id="dropzoneIcon"></i>
+                <span class="text-slate-300 text-sm font-medium pointer-events-none max-w-sm" id="dropzoneText">
+                    Suelta aquí la foto del vehículo<br>
+                    <span class="text-slate-500">o haz clic para elegirla</span>
+                </span>
+                <span class="font-mono text-[10px] text-slate-600 tracking-widest pointer-events-none uppercase">
+                    JPG · PNG · WEBP · máx 10 MB
+                </span>
+                <input type="file" name="imagen" id="imagen" accept=".jpg,.jpeg,.png,.webp,.bmp" class="hidden"
+                    onchange="mostrarNombre(this)">
+            </label>
+
+            <button type="submit" id="btnAnalizar"
+                class="mt-5 w-full inline-flex items-center justify-center gap-2.5 bg-indigo-400 hover:bg-indigo-300 text-slate-900 px-4 py-3.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.01] active:scale-[0.99]">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span id="btnTexto">Leer la placa</span>
+            </button>
+        </form>
+    </div>
+
+    {% if error %}
+    <div class="glass-card border-indigo-400/30 text-indigo-200 rounded-xl px-5 py-4 mb-8 text-sm flex items-center gap-3">
+        <i class="fa-solid fa-triangle-exclamation text-indigo-400"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    {% if resultados %}
+    <!-- Resultados -->
+    <div class="glass-card rounded-2xl p-6">
+        <h2 class="font-display font-semibold uppercase tracking-wide text-white text-xl mb-6 flex items-center gap-2.5">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i>
+            {{ resultados|length }} placa{{ 's' if resultados|length > 1 else '' }} leída{{ 's' if
+            resultados|length > 1 else '' }}
+        </h2>
+
+        <div class="flex flex-wrap gap-6 mb-7">
+            {% for r in resultados %}
+            <div class="flex flex-col items-center gap-2.5">
+                <div class="plate plate-stamp text-4xl" style="animation-delay: {{ loop.index0 * 0.15 }}s">
+                    <span class="plate-band">PE</span>
+                    <span class="plate-num">{{ r.placa }}</span>
+                </div>
+                <div class="flex items-center gap-2 w-full px-1">
+                    <div class="flex-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                        <div class="h-full bg-emerald-400 rounded-full" style="width: {{ r.confianza }}%"></div>
+                    </div>
+                    <span class="font-mono text-[10px] text-emerald-400">{{ r.confianza }}%</span>
+                </div>
+                <p class="font-mono text-[9px] text-slate-600 uppercase tracking-widest">confianza detección</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if imagen_anotada %}
+        <div class="viewfinder rounded-xl overflow-hidden border border-white/[0.06] bg-black">
+            <span class="vf-corner tl"></span>
+            <span class="vf-corner tr"></span>
+            <span class="vf-corner bl"></span>
+            <span class="vf-corner br"></span>
+            <img src="data:image/jpeg;base64,{{ imagen_anotada }}" alt="Imagen analizada con las placas marcadas"
+                class="w-full object-contain max-h-[500px]">
+        </div>
+        {% endif %}
+
+        <div class="mt-6 flex flex-wrap gap-3">
+            <a href="{{ url_for('historial') }}"
+                class="inline-flex items-center gap-2 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 border border-indigo-400/20 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
+                <i class="fa-solid fa-clock-rotate-left text-xs"></i> Ver mi historial
+            </a>
+            <a href="{{ url_for('subir') }}"
+                class="inline-flex items-center gap-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.08] px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
+                <i class="fa-solid fa-rotate-right text-xs"></i> Probar otra imagen
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    function mostrarNombre(input) {
+        if (input.files && input.files[0]) {
+            document.getElementById('dropzoneText').innerHTML =
+                "📷 <span class='text-white font-semibold'>" + input.files[0].name + "</span><br>" +
+                "<span class='text-slate-500'>Lista para analizar</span>";
+            document.getElementById('dropzone').classList.add('vf-activo');
+        }
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', function (e) {
+        const input = document.getElementById('imagen');
+        if (!input.files || !input.files.length) return; // el servidor mostrará el aviso
+
+        const btn = document.getElementById('btnAnalizar');
+        btn.disabled = true;
+        btn.classList.add('opacity-60', 'cursor-wait');
+        document.getElementById('btnTexto').textContent = "Leyendo placa…";
+        // Activar la línea de escaneo del visor
+        document.getElementById('dropzone').classList.add('escaneando', 'vf-activo');
+    });
+
+    // --- Arrastrar y soltar ---
+    const dropzone = document.getElementById('dropzone');
+    const inputImagen = document.getElementById('imagen');
+    const dropzoneText = document.getElementById('dropzoneText');
+
+    function resaltar(activo) {
+        dropzone.classList.toggle('vf-activo', activo);
+        dropzone.classList.toggle('bg-indigo-500/10', activo);
+    }
+
+    ['dragenter', 'dragover'].forEach(function (evento) {
+        dropzone.addEventListener(evento, function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            resaltar(true);
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(function (evento) {
+        dropzone.addEventListener(evento, function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (evento === 'dragleave' && !inputImagen.files.length) resaltar(false);
+            else if (evento === 'dragleave') dropzone.classList.remove('bg-indigo-500/10');
+        });
+    });
+
+    dropzone.addEventListener('drop', function (e) {
+        const archivos = e.dataTransfer.files;
+        if (!archivos.length) return;
+
+        const archivo = archivos[0];
+        if (!archivo.type.startsWith('image/')) {
+            dropzoneText.innerHTML = "⚠️ Eso no es una imagen.<br><span class='text-slate-500'>Suelta un archivo JPG, PNG o WEBP.</span>";
+            dropzone.classList.remove('bg-indigo-500/10', 'vf-activo');
+            return;
+        }
+
+        const dt = new DataTransfer();
+        dt.items.add(archivo);
+        inputImagen.files = dt.files;
+        dropzone.classList.remove('bg-indigo-500/10');
+        mostrarNombre(inputImagen);
+    });
+
+    // Evitar que el navegador abra la imagen si la sueltan fuera del recuadro
+    ['dragover', 'drop'].forEach(function (evento) {
+        document.addEventListener(evento, function (e) { e.preventDefault(); });
+    });
+</script>
+{% endblock %}

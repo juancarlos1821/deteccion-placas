@@ -1,5 +1,10 @@
-import mysql.connector
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
+
+load_dotenv()
 
 def migrate_passwords():
     print("Iniciando migración de contraseñas...")
@@ -7,13 +12,15 @@ def migrate_passwords():
     conn = None
     try:
         # Conectar a la base de datos
-        conn = mysql.connector.connect(
-            host='127.0.0.1',
-            user='root',
-            password='',
-            database='control_vehicular'
+        conn = psycopg2.connect(
+            host=os.environ.get('SUPABASE_DB_HOST'),
+            port=os.environ.get('SUPABASE_DB_PORT', '6543'),
+            user=os.environ.get('SUPABASE_DB_USER'),
+            password=os.environ.get('SUPABASE_DB_PASSWORD'),
+            dbname=os.environ.get('SUPABASE_DB_NAME', 'postgres'),
+            sslmode='require'
         )
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         # Obtener todos los usuarios
         cursor.execute("SELECT id, username, password FROM usuarios")
@@ -45,13 +52,13 @@ def migrate_passwords():
         print(f"\nMigración completada. Usuarios actualizados: {migrated_count}")
         cursor.close()
         
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         print(f"Error de base de datos: {err}")
     except Exception as e:
         print(f"Error inesperado: {e}")
     finally:
         # Cerramos la conexión siempre, ocurra o no un error
-        if conn and conn.is_connected():
+        if conn and not conn.closed:
             conn.close()
 
 if __name__ == "__main__":

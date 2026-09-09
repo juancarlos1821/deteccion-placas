@@ -1,0 +1,19 @@
+# El entorno virtual pesa 2,3 GB: si entra en el contexto de construcción, la
+# imagen tarda una eternidad y no cabe. Las dependencias se instalan dentro.
+venv/
+__pycache__/
+*.pyc
+
+.git/
+.gitignore
+node_modules/
+package-lock.json
+
+# Credenciales: en Hugging Face van como "secrets", nunca dentro de la imagen.
+.env
+
+# Subidas de ejecuciones anteriores.
+static/capturas/
+
+# Vídeos de prueba: la demo pública es por foto.
+*.mp4
