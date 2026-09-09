@@ -1,186 +1,339 @@
 {% extends 'base.html' %}
 
-{% block title %}Subir imagen · PlacaScan{% endblock %}
+{% block title %}Lee la placa de una foto · PlacaScan{% endblock %}
+
+{% block estilos %}
+<style>
+    /* --- Encabezado ------------------------------------------------------ */
+    .intro { max-width: 34rem; }
+
+    .intro h1 {
+        margin: 0;
+        font-family: "Saira Condensed", sans-serif;
+        font-weight: 700;
+        font-size: clamp(2.1rem, 6vw, 3.1rem);
+        line-height: 1.05;
+        letter-spacing: -0.01em;
+    }
+
+    .intro p {
+        margin: 0.85rem 0 0;
+        color: var(--tinta-suave);
+        max-width: 30rem;
+    }
+
+    /* --- Zona de carga ---------------------------------------------------- */
+    .taller {
+        margin-top: 2.25rem;
+        background: var(--superficie);
+        border: 1px solid var(--linea);
+        border-radius: 14px;
+        padding: 1.25rem;
+    }
+
+    .soltar {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65rem;
+        width: 100%;
+        min-height: 13rem;
+        padding: 2rem 1.25rem;
+        background: var(--ambiente);
+        border: 2px dashed var(--linea);
+        border-radius: 10px;
+        color: var(--tinta-suave);
+        text-align: center;
+        cursor: pointer;
+        transition: border-color .15s, background-color .15s;
+    }
+
+    .soltar:hover,
+    .soltar.encima {
+        border-color: var(--azul);
+        background: #dde4ea;
+    }
+
+    .soltar strong {
+        display: block;
+        color: var(--tinta);
+        font-size: 1.05rem;
+        font-weight: 600;
+    }
+
+    .soltar small { font-size: 0.82rem; }
+
+    /* La vista previa reemplaza al texto en cuanto hay archivo. */
+    .vista-previa {
+        max-height: 15rem;
+        max-width: 100%;
+        border-radius: 6px;
+        border: 1px solid var(--linea);
+    }
+
+    .accion {
+        display: block;
+        width: 100%;
+        margin-top: 1rem;
+        padding: 0.95rem 1.5rem;
+        background: var(--azul);
+        color: #fff;
+        border: 0;
+        border-radius: 9px;
+        font-family: inherit;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color .15s;
+    }
+
+    .accion:hover { background: var(--azul-hondo); }
+
+    .accion[disabled] {
+        background: var(--ambiente-hondo);
+        color: var(--tinta-suave);
+        cursor: progress;
+    }
+
+    /* --- Aviso ------------------------------------------------------------ */
+    .aviso {
+        margin-top: 1.25rem;
+        padding: 0.9rem 1.1rem;
+        background: var(--superficie);
+        border: 1px solid var(--linea);
+        border-left: 4px solid var(--alerta);
+        border-radius: 8px;
+        color: var(--tinta);
+    }
+
+    /* --- Resultado -------------------------------------------------------- */
+    .lectura { margin-top: 2.5rem; }
+
+    .lectura-titulo {
+        margin: 0 0 1rem;
+        font-family: "Saira Condensed", sans-serif;
+        font-weight: 600;
+        font-size: 1.5rem;
+    }
+
+    .fichas {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1fr;
+    }
+
+    /* La placa: el objeto del que trata todo esto. Blanca, con la franja azul
+       a la izquierda y los caracteres condensados, como una placa peruana. */
+    .placa {
+        display: flex;
+        align-items: stretch;
+        background: var(--superficie);
+        border: 3px solid var(--tinta);
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: inset 0 0 0 2px var(--superficie), inset 0 0 0 3px #e9edf0;
+    }
+
+    .placa-tira {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.15rem;
+        width: 3.1rem;
+        padding: 0.75rem 0;
+        background: var(--azul);
+        color: #fff;
+        font-family: "Saira Condensed", sans-serif;
+    }
+
+    .placa-tira b { font-size: 1.15rem; font-weight: 700; letter-spacing: .05em; }
+    .placa-tira span { font-size: .62rem; opacity: .85; }
+
+    .placa-cuerpo {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.1rem 0.75rem;
+        min-width: 0;
+    }
+
+    .placa-cuerpo span {
+        font-family: "Saira Condensed", sans-serif;
+        font-weight: 700;
+        font-size: clamp(2.4rem, 9vw, 3.6rem);
+        line-height: 1;
+        letter-spacing: 0.06em;
+        word-break: break-all;
+    }
+
+    .certeza {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        margin-top: 0.6rem;
+        font-size: 0.9rem;
+        color: var(--tinta-suave);
+    }
+
+    .certeza b {
+        color: var(--verde);
+        font-weight: 600;
+    }
+
+    .anotada {
+        display: block;
+        width: 100%;
+        border: 1px solid var(--linea);
+        border-radius: 10px;
+    }
+
+    .nota {
+        margin-top: 1.75rem;
+        font-size: 0.88rem;
+        color: var(--tinta-suave);
+    }
+
+    @media (min-width: 720px) {
+        .taller { padding: 1.75rem; }
+        .accion { width: auto; min-width: 15rem; }
+        .fichas { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
+    }
+
+    /* La única animación: responde a una acción del visitante, revelando lo
+       que acaba de pedir. */
+    @media (prefers-reduced-motion: no-preference) {
+        .lectura { animation: entrar .45s cubic-bezier(.2,.7,.3,1) both; }
+        @keyframes entrar {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: none; }
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
+<section class="intro">
+    <h1>Lee la placa de una foto</h1>
+    <p>
+        Elige una imagen donde se vea la placa de un vehículo. YOLOv8 la localiza
+        en la escena y PaddleOCR transcribe sus caracteres.
+    </p>
+</section>
 
-    <!-- Header -->
-    <div class="mb-8">
-        <p class="font-mono text-[11px] text-indigo-400 tracking-[0.25em] uppercase mb-2">
-            YOLOv8 localiza · PaddleOCR lee
-        </p>
-        <h1 class="font-display font-bold uppercase tracking-wide text-white text-4xl leading-none">
-            Sube. Detecta. Lee.
-        </h1>
-        <p class="text-slate-400 text-sm mt-3 max-w-lg">
-            Elige una foto donde se vea la placa del vehículo. La IA la encontrará,
-            leerá sus caracteres y la guardará en tu historial privado.
-        </p>
-    </div>
+<form class="taller" id="uploadForm" method="POST" action="{{ url_for('subir') }}" enctype="multipart/form-data">
+    <label class="soltar" id="dropzone" for="imagen">
+        <img class="vista-previa" id="vistaPrevia" alt="" hidden>
+        <span id="dropzoneText">
+            <strong>Arrastra una foto o haz clic para elegirla</strong>
+            <small>JPG, PNG, WEBP o BMP · hasta 10 MB</small>
+        </span>
+    </label>
+    <input type="file" name="imagen" id="imagen" accept=".jpg,.jpeg,.png,.webp,.bmp" hidden>
 
-    <!-- Formulario: visor de cámara -->
-    <div class="glass-card rounded-2xl p-6 mb-8">
-        <form action="{{ url_for('subir') }}" method="post" enctype="multipart/form-data" id="uploadForm">
+    <button class="accion" type="submit" id="btnAnalizar">
+        <span id="btnTexto">Leer la placa</span>
+    </button>
+</form>
 
-            <label for="imagen" id="dropzone"
-                class="viewfinder flex flex-col items-center justify-center gap-4 bg-black/30 rounded-2xl py-14 px-6 cursor-pointer transition-all text-center border border-white/[0.05] hover:border-indigo-400/30">
-                <!-- Esquinas de encuadre -->
-                <span class="vf-corner tl"></span>
-                <span class="vf-corner tr"></span>
-                <span class="vf-corner bl"></span>
-                <span class="vf-corner br"></span>
-                <!-- Línea de escaneo (visible al analizar) -->
-                <span class="scan-beam"></span>
+{% if error %}
+<p class="aviso">{{ error }}</p>
+{% endif %}
 
-                <i class="fa-solid fa-camera-retro text-4xl text-indigo-400/70 pointer-events-none" id="dropzoneIcon"></i>
-                <span class="text-slate-300 text-sm font-medium pointer-events-none max-w-sm" id="dropzoneText">
-                    Suelta aquí la foto del vehículo<br>
-                    <span class="text-slate-500">o haz clic para elegirla</span>
-                </span>
-                <span class="font-mono text-[10px] text-slate-600 tracking-widest pointer-events-none uppercase">
-                    JPG · PNG · WEBP · máx 10 MB
-                </span>
-                <input type="file" name="imagen" id="imagen" accept=".jpg,.jpeg,.png,.webp,.bmp" class="hidden"
-                    onchange="mostrarNombre(this)">
-            </label>
+{% if resultados %}
+<section class="lectura">
+    <h2 class="lectura-titulo">
+        {{ resultados|length }} placa{{ 's' if resultados|length > 1 else '' }} en la imagen
+    </h2>
 
-            <button type="submit" id="btnAnalizar"
-                class="mt-5 w-full inline-flex items-center justify-center gap-2.5 bg-indigo-400 hover:bg-indigo-300 text-slate-900 px-4 py-3.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.01] active:scale-[0.99]">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <span id="btnTexto">Leer la placa</span>
-            </button>
-        </form>
-    </div>
-
-    {% if error %}
-    <div class="glass-card border-indigo-400/30 text-indigo-200 rounded-xl px-5 py-4 mb-8 text-sm flex items-center gap-3">
-        <i class="fa-solid fa-triangle-exclamation text-indigo-400"></i> {{ error }}
-    </div>
-    {% endif %}
-
-    {% if resultados %}
-    <!-- Resultados -->
-    <div class="glass-card rounded-2xl p-6">
-        <h2 class="font-display font-semibold uppercase tracking-wide text-white text-xl mb-6 flex items-center gap-2.5">
-            <i class="fa-solid fa-circle-check text-emerald-400"></i>
-            {{ resultados|length }} placa{{ 's' if resultados|length > 1 else '' }} leída{{ 's' if
-            resultados|length > 1 else '' }}
-        </h2>
-
-        <div class="flex flex-wrap gap-6 mb-7">
+    <div class="fichas">
+        <div>
             {% for r in resultados %}
-            <div class="flex flex-col items-center gap-2.5">
-                <div class="plate plate-stamp text-4xl" style="animation-delay: {{ loop.index0 * 0.15 }}s">
-                    <span class="plate-band">PE</span>
-                    <span class="plate-num">{{ r.placa }}</span>
+            <div class="placa" {% if not loop.first %}style="margin-top:1rem"{% endif %}>
+                <div class="placa-tira" aria-hidden="true">
+                    <b>PE</b>
+                    <span>PERÚ</span>
                 </div>
-                <div class="flex items-center gap-2 w-full px-1">
-                    <div class="flex-1 h-1 rounded-full bg-white/10 overflow-hidden">
-                        <div class="h-full bg-emerald-400 rounded-full" style="width: {{ r.confianza }}%"></div>
-                    </div>
-                    <span class="font-mono text-[10px] text-emerald-400">{{ r.confianza }}%</span>
+                <div class="placa-cuerpo">
+                    <span>{{ r.placa }}</span>
                 </div>
-                <p class="font-mono text-[9px] text-slate-600 uppercase tracking-widest">confianza detección</p>
             </div>
+            <p class="certeza">
+                Certeza de la detección <b>{{ r.confianza }}%</b>
+            </p>
             {% endfor %}
         </div>
 
         {% if imagen_anotada %}
-        <div class="viewfinder rounded-xl overflow-hidden border border-white/[0.06] bg-black">
-            <span class="vf-corner tl"></span>
-            <span class="vf-corner tr"></span>
-            <span class="vf-corner bl"></span>
-            <span class="vf-corner br"></span>
-            <img src="data:image/jpeg;base64,{{ imagen_anotada }}" alt="Imagen analizada con las placas marcadas"
-                class="w-full object-contain max-h-[500px]">
-        </div>
+        <img class="anotada" src="data:image/jpeg;base64,{{ imagen_anotada }}"
+             alt="La foto que subiste con un recuadro sobre cada placa encontrada">
         {% endif %}
-
-        <div class="mt-6 flex flex-wrap gap-3">
-            <a href="{{ url_for('historial') }}"
-                class="inline-flex items-center gap-2 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 border border-indigo-400/20 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
-                <i class="fa-solid fa-clock-rotate-left text-xs"></i> Ver mi historial
-            </a>
-            <a href="{{ url_for('subir') }}"
-                class="inline-flex items-center gap-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.08] px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
-                <i class="fa-solid fa-rotate-right text-xs"></i> Probar otra imagen
-            </a>
-        </div>
     </div>
-    {% endif %}
-</div>
+
+    <p class="nota">
+        Prueba con otra foto cuando quieras. Nada de lo que subas se conserva.
+    </p>
+</section>
+{% endif %}
 
 <script>
-    function mostrarNombre(input) {
-        if (input.files && input.files[0]) {
-            document.getElementById('dropzoneText').innerHTML =
-                "📷 <span class='text-white font-semibold'>" + input.files[0].name + "</span><br>" +
-                "<span class='text-slate-500'>Lista para analizar</span>";
-            document.getElementById('dropzone').classList.add('vf-activo');
-        }
-    }
+    (function () {
+        var zona = document.getElementById('dropzone');
+        var campo = document.getElementById('imagen');
+        var previa = document.getElementById('vistaPrevia');
+        var texto = document.getElementById('dropzoneText');
+        var form = document.getElementById('uploadForm');
+        var boton = document.getElementById('btnAnalizar');
+        var botonTexto = document.getElementById('btnTexto');
 
-    document.getElementById('uploadForm').addEventListener('submit', function (e) {
-        const input = document.getElementById('imagen');
-        if (!input.files || !input.files.length) return; // el servidor mostrará el aviso
-
-        const btn = document.getElementById('btnAnalizar');
-        btn.disabled = true;
-        btn.classList.add('opacity-60', 'cursor-wait');
-        document.getElementById('btnTexto').textContent = "Leyendo placa…";
-        // Activar la línea de escaneo del visor
-        document.getElementById('dropzone').classList.add('escaneando', 'vf-activo');
-    });
-
-    // --- Arrastrar y soltar ---
-    const dropzone = document.getElementById('dropzone');
-    const inputImagen = document.getElementById('imagen');
-    const dropzoneText = document.getElementById('dropzoneText');
-
-    function resaltar(activo) {
-        dropzone.classList.toggle('vf-activo', activo);
-        dropzone.classList.toggle('bg-indigo-500/10', activo);
-    }
-
-    ['dragenter', 'dragover'].forEach(function (evento) {
-        dropzone.addEventListener(evento, function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            resaltar(true);
-        });
-    });
-
-    ['dragleave', 'drop'].forEach(function (evento) {
-        dropzone.addEventListener(evento, function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (evento === 'dragleave' && !inputImagen.files.length) resaltar(false);
-            else if (evento === 'dragleave') dropzone.classList.remove('bg-indigo-500/10');
-        });
-    });
-
-    dropzone.addEventListener('drop', function (e) {
-        const archivos = e.dataTransfer.files;
-        if (!archivos.length) return;
-
-        const archivo = archivos[0];
-        if (!archivo.type.startsWith('image/')) {
-            dropzoneText.innerHTML = "⚠️ Eso no es una imagen.<br><span class='text-slate-500'>Suelta un archivo JPG, PNG o WEBP.</span>";
-            dropzone.classList.remove('bg-indigo-500/10', 'vf-activo');
-            return;
+        function mostrar(archivo) {
+            if (!archivo) return;
+            var lector = new FileReader();
+            lector.onload = function (e) {
+                previa.src = e.target.result;
+                previa.hidden = false;
+                texto.hidden = true;
+            };
+            lector.readAsDataURL(archivo);
         }
 
-        const dt = new DataTransfer();
-        dt.items.add(archivo);
-        inputImagen.files = dt.files;
-        dropzone.classList.remove('bg-indigo-500/10');
-        mostrarNombre(inputImagen);
-    });
+        campo.addEventListener('change', function () {
+            mostrar(campo.files[0]);
+        });
 
-    // Evitar que el navegador abra la imagen si la sueltan fuera del recuadro
-    ['dragover', 'drop'].forEach(function (evento) {
-        document.addEventListener(evento, function (e) { e.preventDefault(); });
-    });
+        // Arrastrar y soltar: hay que cancelar el comportamiento por defecto
+        // del navegador, que abriria la imagen en la pestaña.
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (evento) {
+            zona.addEventListener(evento, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+
+        ['dragenter', 'dragover'].forEach(function (evento) {
+            zona.addEventListener(evento, function () { zona.classList.add('encima'); });
+        });
+
+        ['dragleave', 'drop'].forEach(function (evento) {
+            zona.addEventListener(evento, function () { zona.classList.remove('encima'); });
+        });
+
+        zona.addEventListener('drop', function (e) {
+            var archivos = e.dataTransfer && e.dataTransfer.files;
+            if (archivos && archivos.length) {
+                campo.files = archivos;
+                mostrar(archivos[0]);
+            }
+        });
+
+        // El plan gratuito duerme el servicio, asi que la primera lectura puede
+        // tardar. Mas vale decirlo que dejar el boton mudo.
+        form.addEventListener('submit', function () {
+            boton.disabled = true;
+            botonTexto.textContent = 'Leyendo la placa…';
+        });
+    })();
 </script>
 {% endblock %}

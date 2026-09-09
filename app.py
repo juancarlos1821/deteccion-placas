@@ -185,9 +185,11 @@ def get_db_connection():
 
 @app.route('/')
 def index():
-    # Sin login: el visitante entra directo al dashboard y su
-    # sesión de invitado se crea sola en el camino.
-    return redirect(url_for('home'))
+    # La raíz lleva a la pantalla de subida, que es lo único que un visitante
+    # puede probar de verdad. El dashboard, el historial y los reportes viven
+    # de la base de datos, así que en la demo pública saldrían todos a cero;
+    # siguen accesibles por su URL para quien ejecute el proyecto en local.
+    return redirect(url_for('subir'))
 
 @app.route('/home')
 @sesion_invitado
