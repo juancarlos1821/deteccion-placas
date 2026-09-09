@@ -1,6 +1,11 @@
 # Imagen para desplegar la demo. Sirve para Render, Fly, Cloud Run o cualquier
 # plataforma que acepte un Dockerfile: el puerto se lee del entorno.
-FROM python:3.10-slim
+#
+# Python 3.12 y no 3.10: es la version donde se verifico la equivalencia entre
+# el motor viejo y el nuevo, y ademas onnxruntime 1.29 no publica ruedas para
+# 3.10 (ahi se queda en la 1.23). OpenCV 4.6 entra igual porque su rueda es
+# abi3, valida de 3.6 en adelante.
+FROM python:3.12-slim
 
 # OpenCV necesita glib aunque sea la variante headless.
 RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 && rm -rf /var/lib/apt/lists/*
